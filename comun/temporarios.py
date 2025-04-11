@@ -1,0 +1,3 @@
+class Temporario:
+    def __init__(self, nome, idade, cargo):
+        ...
