@@ -27,5 +27,6 @@ Thumbs.db
 
 # Discord bot specific
 .env
+json
 config.json
 token.txt

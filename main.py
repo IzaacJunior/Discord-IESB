@@ -1,9 +1,8 @@
 import discord
-from pathlib import Path
 import asyncio
+from pathlib import Path
 from discord.ext import commands
 from decouple import config
-from comandos.audio import Auto
 
 
 intents = discord.Intents.default()
@@ -43,4 +42,4 @@ async def main():
         await bot.close()
 
 
-asyncio.run(main())  # Executa a função principal
+asyncio.run(main())
