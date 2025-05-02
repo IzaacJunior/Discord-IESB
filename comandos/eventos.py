@@ -24,7 +24,6 @@ class Eventos(commands.Cog):
 
         # Verifica se o membro entrou ou saiu de um canal de voz
         if after.channel is not None:
-            print(f"antes de criar {after.channel.name}")
             await self.voice_channel_manager.create_voice_temporarias(
                 after.channel
             )
@@ -42,16 +41,12 @@ class Eventos(commands.Cog):
         if member.bot:
             return
         guild = member.guild
-
-        print("1 Etapa")
         category = await self.text_channel_manager.category_text_channel(
             guild=guild
         )
         if category is None:
             ...
 
-
-        
         channel_overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             member: discord.PermissionOverwrite(
@@ -68,8 +63,6 @@ class Eventos(commands.Cog):
             )
         }
 
-            
-        print("3 Etapa")
         new_channel: discord.TextChannel = await category.create_text_channel(
             name=f"chat-{member.nick or member.name}".lower(),
             overwrites=channel_overwrites           

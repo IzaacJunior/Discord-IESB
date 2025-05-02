@@ -117,9 +117,7 @@ class TableManager:
     def delete_category(self, category_id: int) -> bool:
         """Remove uma categoria do banco de dados."""
         if self.table.contains(doc_id=category_id):
-            print(self.table.all())
             self.table.remove(doc_ids=[category_id])
-            print(self.table.all())
             return True
         return False
 

@@ -79,7 +79,6 @@ class ADM(commands.Cog):
 
         # Move todos os membros para o novo canal
         for channel in channels:
-            print(channel.name)
             if len(channel.members) != 0:
                 new_channel = await self.voice_channel_manager.create_voice_temporarias(channel)
         # Lógica para criar botões para canais de voz temporários

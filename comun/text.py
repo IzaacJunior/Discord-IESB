@@ -2,8 +2,9 @@ import discord
 
 
 from comun.smalldb import SmallDB
-
+# Em desenvolvimento, o banco de dados é um arquivo JSON
 class TextManager:
+
     def __init__(self, path: str) -> None:
         self.path = path
         self.db = SmallDB(path).get("text_channels")
@@ -19,7 +20,6 @@ class TextManager:
             db = self.db.get_table(self.path)
             category_id = db.list_keys()[0]
             return category
-        print("2 Etapa")
         category: discord.CategoryChannel = await guild.create_category(
             name=self.path,
             overwrites=category_overwrites

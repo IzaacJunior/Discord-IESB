@@ -13,10 +13,8 @@ class VoiceManager:
         db_category = self.table.get_id(channel.category.id)
         if not self.table.exists(channel.category.id):
             # Cria a categoria no banco de dados se não existir
-            print('categoria nao existe 17')
             db_category.create()
             return True
-        print('categoria existe 19')
         return False
         
 
@@ -26,18 +24,13 @@ class VoiceManager:
     ) -> discord.VoiceChannel|None:
         """Adiciona um canal temporário."""
         # Verifica se o canal original já existe
-        print('antes')
         # -------- Verifições -----------
-        print(channel.category.id)
         if not self.table.exists(channel.category.id):
-            print('categoria nao existe 28')
+
             return 
         db_category = self.table.get_id(channel.category.id)
         if channel.id in self.table.get_id(channel.category.id).get_key(self.path):
-        
-            print('canal ja existe 32')
             return None
-        print('depois')
         new_channel: discord.VoiceChannel = await channel.category.create_voice_channel(
             name=f"{channel.category.name} {channel.name}",  
             bitrate=channel.bitrate,                 # Mesmo bitrate
@@ -45,12 +38,9 @@ class VoiceManager:
             overwrites=channel.overwrites            # Mesmas permissões
         )
         # Adiciona o novo canal à categoria no banco de dados
-        print('antes de salvar')
-        print(self.path)
         db_category.add_values(
             self.path, [new_channel.id]
         )
-        print('depois de salvar')
         
         # mover todos os membros para o novo canal
         for member in channel.members:
