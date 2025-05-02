@@ -16,18 +16,27 @@ bot = commands.Bot(
 
 
 async def load_cogs(bot):  
+    filer_comandos = Path("comandos")
+    filer_slash = Path("slash")
     await bot.load_extension("manager")
-    for file in Path("comandos").glob("*.py"): 
+    for file in filer_comandos.glob("*.py"): 
         if file.stem == "__init__":
             continue
         if file.suffix == ".py":
-            await bot.load_extension(f"comandos.{file.stem}")
-
+            await bot.load_extension(f'{filer_comandos}.{file.stem}') 
+    
+    for file in filer_slash.glob("*.py"): 
+        if file.stem == "__init__":
+            continue
+        if file.suffix == ".py":
+            await bot.load_extension(f'{filer_slash}.{file.stem}')
 
 async def main():  
     try:
         async with bot:
+            
             TOKEN = config("TOKEN")
+            
             await load_cogs(bot)
             await bot.start(TOKEN)
     except KeyboardInterrupt:

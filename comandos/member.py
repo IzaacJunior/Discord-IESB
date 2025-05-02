@@ -8,9 +8,19 @@ class Normy(commands.Cog):
         self.bot = bot
 
     
-    @commands.command(name="name", help="Muda seu nome nesse servidor\n Não coloque apelidos!")
-    async def mudar_nome(self, ctx, Nome: str):        
+    @commands.command(
+        name="name", 
+        help="Muda seu nome nesse servidor\n Não coloque apelidos!"
+    )
+    async def mudar_nome(self, ctx, Nome: str): 
+        """Muda o nome do usuário no servidor.""" 
+        if ctx.author.nick:
+            # Se o usuário já tem um apelido, não pode mudar o nome
+            await ctx.send("Você já tem um apelido!")
+            return 
+        
         await ctx.author.edit(nick=Nome)
+        
         await ctx.send(f"Seu nome foi alterado para: {Nome}")
         print(f"{ctx.author.name} mudou o nome para {Nome}")
         
@@ -19,7 +29,7 @@ class Normy(commands.Cog):
             name="clear", 
             help="Analizo as ultimas 50 mensagens e posso deletar até 20 mensagens suas"
         )
-    async def clear(self, ctx, limit: int = 1):
+    async def clear(self, ctx, limit: int = 10):
         await asyncio.sleep(1)
         mensagens_channel = ctx.channel.history(limit=50)
 
