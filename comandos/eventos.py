@@ -38,14 +38,17 @@ class Eventos(commands.Cog):
     # Evento é acionado quando um membro entra na guilda
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
+        print(f"{member.name} entrou no servidor {member.guild.name}")
         if member.bot:
             return
+        print("C1")
         guild = member.guild
-        category = await self.text_channel_manager.category_text_channel(
+        print("C2")
+        category: discord.CategoryChannel = await self.text_channel_manager.category_text_channel(
             guild=guild
         )
-        if category is None:
-            ...
+        
+        print("Criando canal de texto")
 
         channel_overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),

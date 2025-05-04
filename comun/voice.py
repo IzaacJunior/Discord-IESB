@@ -6,7 +6,7 @@ from comun.smalldb import SmallDB
 class VoiceManager:
     def __init__(self, path) -> None:
         self.path = "voice_channels"
-        self.table = SmallDB(path).get(self.path)
+        self.table = SmallDB(path).get(path)
         
 
     async def add_category(self, channel: discord.VoiceChannel) -> bool  :

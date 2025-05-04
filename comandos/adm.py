@@ -55,6 +55,7 @@ class ADM(commands.Cog):
                 delete_after=5
             )
 
+
     @commands.command(
         name="+voice", 
         help="Adiciona uma sala temporária de voz ao servidor"
