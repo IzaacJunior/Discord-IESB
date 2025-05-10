@@ -12,17 +12,20 @@ class Normy(commands.Cog):
         name="name", 
         help="Muda seu nome nesse servidor\n Não coloque apelidos!"
     )
-    async def mudar_nome(self, ctx, Nome: str): 
-        """Muda o nome do usuário no servidor.""" 
+    async def mudar_nome(self, ctx, *nome): 
+        """Muda o nome do usuário no servidor."""
+        print(nome)
+        nome = " ".join(nome)
+        print(nome)
         if ctx.author.nick:
             # Se o usuário já tem um apelido, não pode mudar o nome
             await ctx.send("Você já tem um apelido!")
             return 
         
-        await ctx.author.edit(nick=Nome)
+        await ctx.author.edit(nick=nome)
         
-        await ctx.send(f"Seu nome foi alterado para: {Nome}")
-        print(f"{ctx.author.name} mudou o nome para {Nome}")
+        await ctx.send(f"Seu nome foi alterado para: {nome}")
+        print(f"{ctx.author.name} mudou o nome para {nome}")
         
 
     @commands.command(
