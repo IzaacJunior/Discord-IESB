@@ -1,14 +1,16 @@
 from discord.ext import commands
 import discord
 
-from comun.voice import VoiceManager
+# TODO: Migrar para Clean Architecture
+# from comun.voice import VoiceManager
 
 
 class ADM(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.voice_channel_manager = VoiceManager("channels")
+        # TODO: Migrar para Clean Architecture - VoiceManager temporariamente desabilitado
+        # self.voice_channel_manager = VoiceManager("channels")
 
     
     @commands.command(

@@ -2,16 +2,18 @@ import discord
 from discord.ext import commands
 from discord import Permissions, PermissionOverwrite
 
-from comun.voice import VoiceManager
-from comun.text import TextManager
+# TODO: Migrar para Clean Architecture
+# from comun.voice import VoiceManager
+# from comun.text import TextManager
 
 
 class Eventos(commands.Cog):    
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.voice_channel_manager = VoiceManager("channels")
-        self.text_channel_manager = TextManager("channels")
+        # TODO: Migrar para Clean Architecture - Managers temporariamente desabilitados
+        # self.voice_channel_manager = VoiceManager("channels")
+        # self.text_channel_manager = TextManager("channels")
 
     @commands.Cog.listener()
     async def on_voice_state_update(

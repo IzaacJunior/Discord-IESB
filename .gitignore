@@ -191,5 +191,4 @@ battle_logs/
 command_logs/
 .github/
 docs/
-../json/
-json/channels.json
+json/
