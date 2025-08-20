@@ -12,10 +12,10 @@ from domain.entities import ChannelType
 class CreateChannelDTO:
     """
     📝 Dados para criar um novo canal
-    
+
     💡 Boa Prática: DTO de entrada com validação implícita!
     """
-    
+
     name: str
     guild_id: int
     channel_type: ChannelType
@@ -29,10 +29,10 @@ class CreateChannelDTO:
 class ChannelResponseDTO:
     """
     📤 Dados de resposta de um canal
-    
+
     💡 Boa Prática: DTO de saída com dados essenciais!
     """
-    
+
     id: int
     name: str
     channel_type: ChannelType

@@ -1,10 +1,10 @@
 """
-🏗️ Database Infrastructure
-💡 Boa Prática: Componentes de persistência!
+Database Infrastructure
+Boa Prática: Componentes de persistência!
 """
 
-from .smalldb_manager import SmallDBManager
+from .smalldb_manager import SmallDB
 
 __all__ = [
-    "SmallDBManager",
+    "SmallDB",
 ]

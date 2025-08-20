@@ -10,10 +10,10 @@ from dataclasses import dataclass
 class MemberDTO:
     """
     👤 Dados de um membro para transferência
-    
+
     💡 Boa Prática: Estrutura simples e imutável!
     """
-    
+
     id: int
     name: str
     display_name: str | None = None

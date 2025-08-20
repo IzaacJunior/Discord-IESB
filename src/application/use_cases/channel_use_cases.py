@@ -16,103 +16,92 @@ logger = logging.getLogger(__name__)
 class CreateChannelUseCase:
     """
     🏗️ Caso de uso para criar canais
-    
+
     💡 Boa Prática: Coordena múltiplas operações e aplica
     regras de negócio complexas!
     """
-    
+
     def __init__(self, channel_repository: ChannelRepository):
         self.channel_repository = channel_repository
-    
+
     async def execute(self, request: CreateChannelDTO) -> ChannelResponseDTO:
         """
         ✨ Executa a criação de um canal
-        
+
         💡 Boa Prática: Método único e claro que encapsula
         toda a lógica do caso de uso!
         """
         logger.info(
-            "🏗️ Criando canal: %s (tipo: %s)", 
-            request.name, 
-            request.channel_type.value
+            "🏗️ Criando canal: %s (tipo: %s)", request.name, request.channel_type.value
         )
-        
-        try:
-            if request.channel_type == ChannelType.TEXT:
-                channel = await self.channel_repository.create_text_channel(
-                    name=request.name,
-                    guild_id=request.guild_id,
-                    category_id=request.category_id,
-                    topic=request.topic,
-                )
-            elif request.channel_type == ChannelType.VOICE:
-                channel = await self.channel_repository.create_voice_channel(
-                    name=request.name,
-                    guild_id=request.guild_id,
-                    category_id=request.category_id,
-                    user_limit=request.user_limit,
-                    bitrate=request.bitrate,
-                )
-            else:
-                raise ValueError(f"Tipo de canal não suportado: {request.channel_type}")
-            
-            logger.info("✅ Canal criado com sucesso: %s", channel.name)
-            
-            return ChannelResponseDTO(
-                id=channel.id,
-                name=channel.name,
-                channel_type=channel.channel_type(),
-                guild_id=channel.guild_id,
-                category_id=channel.category_id,
-                created=True,
-            )
-        
-        except Exception as e:
-            logger.exception("❌ Erro ao criar canal: %s", request.name)
-            # Retorna resposta de falha ao invés de propagar exceção
-            return ChannelResponseDTO(
-                id=0,
+
+        # 🏗️ Cria canal baseado no tipo
+        if request.channel_type == ChannelType.TEXT:
+            channel = await self.channel_repository.create_text_channel(
                 name=request.name,
-                channel_type=request.channel_type,
                 guild_id=request.guild_id,
                 category_id=request.category_id,
-                created=False,
+                topic=request.topic,
             )
+        elif request.channel_type == ChannelType.VOICE:
+            channel = await self.channel_repository.create_voice_channel(
+                name=request.name,
+                guild_id=request.guild_id,
+                category_id=request.category_id,
+                user_limit=request.user_limit,
+                bitrate=request.bitrate,
+            )
+        else:
+            msg = f"Tipo de canal não suportado: {request.channel_type}"
+            raise ValueError(msg)
+
+        logger.info("✅ Canal criado com sucesso: %s", channel.name)
+
+        return ChannelResponseDTO(
+            id=channel.id,
+            name=channel.name,
+            channel_type=channel.channel_type(),
+            guild_id=channel.guild_id,
+            category_id=channel.category_id,
+            created=True,
+        )
 
 
 class ManageTemporaryChannelsUseCase:
     """
     🔄 Caso de uso para gerenciar canais temporários
-    
+
     💡 Boa Prática: Lógica complexa de criação/remoção
     encapsulada em um só lugar!
     """
-    
+
     def __init__(self, channel_repository: ChannelRepository):
         self.channel_repository = channel_repository
-    
+
     async def create_temporary_channel(
-        self, 
+        self,
         base_channel_id: int,
         guild_id: int,
     ) -> ChannelResponseDTO | None:
         """
         ⚡ Cria canal temporário baseado em outro canal
-        
+
         💡 Boa Prática: Operação específica e bem documentada!
         """
         logger.info("⚡ Criando canal temporário baseado em: %s", base_channel_id)
-        
+
         try:
             # Busca o canal base
-            base_channel = await self.channel_repository.get_channel_by_id(base_channel_id)
+            base_channel = await self.channel_repository.get_channel_by_id(
+                base_channel_id
+            )
             if not base_channel:
                 logger.warning("❌ Canal base não encontrado: %s", base_channel_id)
                 return None
-            
+
             # Cria canal temporário
             temp_name = f"Temp {base_channel.name}"
-            
+
             if isinstance(base_channel, VoiceChannel):
                 temp_channel = await self.channel_repository.create_voice_channel(
                     name=temp_name,
@@ -131,9 +120,9 @@ class ManageTemporaryChannelsUseCase:
             else:
                 logger.warning("❌ Tipo de canal não suportado para temporário")
                 return None
-            
+
             logger.info("✅ Canal temporário criado: %s", temp_channel.name)
-            
+
             return ChannelResponseDTO(
                 id=temp_channel.id,
                 name=temp_channel.name,
@@ -142,25 +131,25 @@ class ManageTemporaryChannelsUseCase:
                 category_id=temp_channel.category_id,
                 created=True,
             )
-        
+
         except Exception:
             logger.exception("❌ Erro ao criar canal temporário")
             return None
-    
+
     async def cleanup_empty_channel(self, channel_id: int) -> bool:
         """
         🧹 Remove canal se estiver vazio
-        
+
         💡 Boa Prática: Lógica de limpeza automática!
         """
         logger.info("🧹 Verificando se canal está vazio: %s", channel_id)
-        
+
         try:
             success = await self.channel_repository.delete_channel(channel_id)
-            if success:
-                logger.info("✅ Canal vazio removido: %s", channel_id)
-            return success
-        
         except Exception:
             logger.exception("❌ Erro ao remover canal vazio: %s", channel_id)
             return False
+        else:
+            if success:
+                logger.info("✅ Canal vazio removido: %s", channel_id)
+            return success
