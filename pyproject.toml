@@ -1,7 +1,7 @@
 [project]
-name = "BattleBot"
+name = "iesb"
 version = "0.0.1"
-description = "BattleBot"
+description = "iesb"
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Izaac", email = "izaacjrrm@email.com" }]
@@ -9,6 +9,7 @@ requires-python = "==3.13.5"
 dependencies = [
     "discord.py>=2.3.0",
     "python-decouple>=3.8",
+    "tinydb>=4.8.2",
 ]
 
 [project.urls]
@@ -17,7 +18,7 @@ dependencies = [
 dev = ["ruff", "pyright", "pytest", "pytest-xdist"]
 
 [project.scripts]
-battlebot = "main:main"
+iesb = "main:main"
 
 [tool.ruff]
 line-length = 88
