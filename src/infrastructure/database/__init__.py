@@ -1,9 +1,9 @@
 """
 Database Infrastructure
-Boa Prática: Componentes de persistência!
+💡 Boa Prática: Componentes de persistência melhorados!
 """
 
-from .smalldb_manager import SmallDB
+from .sql_manager import SQLDatabase as SmallDB
 
 __all__ = [
     "SmallDB",
