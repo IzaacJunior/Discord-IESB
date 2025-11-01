@@ -3,12 +3,26 @@ import logging
 import discord
 from discord.ext import commands
 
+from infrastructure.repositories import DiscordChannelRepository
+from presentation.controllers.channel_controller import ChannelController
+
 logger = logging.getLogger(__name__)
 
 
 class ADM(commands.Cog):
-    def __init__(self, bot):
+    """
+    🔧 Comandos administrativos do bot
+    
+    💡 Boa Prática: Injeta dependências para manter
+    baixo acoplamento e facilitar testes!
+    """
+    
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+        
+        # 🏗️ Injeção de dependência - Clean Architecture!
+        channel_repository = DiscordChannelRepository(bot)
+        self.channel_controller = ChannelController(channel_repository)
 
     @commands.command(name="des", help="Desconecta o bot e o faz ficar offline")
     @commands.has_permissions(administrator=True)
@@ -45,55 +59,109 @@ class ADM(commands.Cog):
             await ctx.send(f"{len(deleted)} mensagem(ns) deletada(s).", delete_after=5)
 
     @commands.command(
-        name="+voice", help="Adiciona uma sala temporária de voz ao servidor"
+        name="+voice", help="Marca categoria atual como geradora de salas temporárias"
     )
     @commands.has_permissions(administrator=True)
     async def add_category(self, ctx: commands.Context) -> None:
-        """Adiciona uma categoria ao servidor."""
-        # --------- Verifições -----------
+        """
+        🎙️ Marca uma categoria como geradora de salas temporárias
+        
+        💡 Funcionamento:
+        1. Admin usa comando em canal de voz
+        2. Categoria do canal é marcada como "temp room generator"
+        3. Sistema salva no banco de dados
+        4. Quando alguém entrar em canais dessa categoria, cria sala temporária
+        """
+        # 🔍 Verificações de segurança
         if ctx.author.voice is None or ctx.author.voice.channel is None:
-            await ctx.send("Você não está em um canal de voz.")
+            await ctx.send("❌ Você precisa estar em um canal de voz!", delete_after=5)
             return
+            
         if ctx.author.voice.channel.category is None:
-            await ctx.send("O canal de voz não está em uma categoria.")
+            await ctx.send("❌ O canal de voz precisa estar em uma categoria!", delete_after=5)
             return
 
-        channels = ctx.author.voice.channel.category.voice_channels
-        if not await self.voice_channel_manager.add_category(ctx.author.voice.channel):
-            await ctx.send("A categoria já existe.")
-            return
-
-        # Move todos os membros para o novo canal
-        for channel in channels:
-            if len(channel.members) != 0:
-                new_channel = await self.voice_channel_manager.create_voice_temporarias(
-                    channel
+        category = ctx.author.voice.channel.category
+        
+        try:
+            # 🚀 Delega para o controller marcar categoria como temp room generator
+            success = await self.channel_controller.handle_mark_category_as_temp_generator(
+                category=category,
+                guild_id=ctx.guild.id
+            )
+            
+            if success:
+                await ctx.send(
+                    f"✅ Categoria **{category.name}** marcada como geradora de salas temporárias!\n"
+                    f"💡 Agora, quando alguém entrar em qualquer canal desta categoria, "
+                    f"uma sala temporária será criada automaticamente! 🎉",
+                    delete_after=10
                 )
-        # Lógica para criar botões para canais de voz temporários
-        # config button:
-        # nome do canal
-        # limite de usuários do canal
-        # peremissões do canal
-        # Por roll
+                logger.info("✅ Categoria %s marcada como temp generator", category.name)
+            else:
+                await ctx.send(
+                    f"⚠️ A categoria **{category.name}** já está configurada como geradora!",
+                    delete_after=5
+                )
+                logger.warning("⚠️ Categoria %s já está configurada", category.name)
+                
+        except Exception as e:
+            logger.error("❌ Erro ao configurar categoria: %s", str(e))
+            await ctx.send(
+                f"❌ Erro ao configurar categoria: {str(e)}",
+                delete_after=5
+            )
 
     @commands.command(
-        name="-voice", help="Remove uma sala temporária de voz do servidor"
+        name="-voice", help="Remove configuração de categoria de salas temporárias"
     )
     @commands.has_permissions(administrator=True)
     async def remove_category(self, ctx: commands.Context) -> None:
-        """Remove uma categoria do servidor."""
-        if ctx.author.voice.channel is None:
-            await ctx.send("Você não está em um canal de voz.")
+        """
+        🗑️ Remove marcação de categoria como geradora de salas temporárias
+        
+        💡 Funcionamento:
+        1. Admin usa comando em canal de voz
+        2. Categoria do canal deixa de gerar salas temporárias
+        3. Sistema remove configuração do banco
+        """
+        # 🔍 Verificações de segurança
+        if ctx.author.voice is None or ctx.author.voice.channel is None:
+            await ctx.send("❌ Você precisa estar em um canal de voz!", delete_after=5)
             return
+            
         if ctx.author.voice.channel.category is None:
-            await ctx.send("Você não está em uma categoria.")
+            await ctx.send("❌ O canal de voz precisa estar em uma categoria!", delete_after=5)
             return
-        if await self.voice_channel_manager.del_category(
-            ctx.author.voice.channel.category
-        ):
-            logger.info("✅ Categoria deletada com sucesso")
-            return
-        logger.warning("⚠️ Categoria não existe ou não pôde ser deletada")
+
+        category = ctx.author.voice.channel.category
+        
+        try:
+            # 🗑️ Delega para o controller remover categoria
+            success = await self.channel_controller.handle_unmark_category_as_temp_generator(
+                category_id=category.id,
+                guild_id=ctx.guild.id
+            )
+            
+            if success:
+                await ctx.send(
+                    f"✅ Categoria **{category.name}** não gera mais salas temporárias!",
+                    delete_after=5
+                )
+                logger.info("✅ Categoria %s desmarcada", category.name)
+            else:
+                await ctx.send(
+                    f"⚠️ A categoria **{category.name}** não estava configurada!",
+                    delete_after=5
+                )
+                logger.warning("⚠️ Categoria %s não estava configurada", category.name)
+                
+        except Exception as e:
+            logger.error("❌ Erro ao remover categoria: %s", str(e))
+            await ctx.send(
+                f"❌ Erro ao remover categoria: {str(e)}",
+                delete_after=5
+            )
 
 
 async def setup(bot):

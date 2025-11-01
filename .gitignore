@@ -192,3 +192,7 @@ command_logs/
 .github/
 docs/
 json/
+
+# 🔧 Ferramentas de desenvolvimento (scripts auxiliares)
+tools/
+*.backup

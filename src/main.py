@@ -15,7 +15,6 @@ from infrastructure.repositories import DiscordChannelRepository
 from manager import CleanArchitectureManager
 from presentation.controllers import ChannelController
 
-# 🎯 Configuração do bot
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
@@ -66,14 +65,14 @@ class CleanArchitectureBot:
 
     async def load_clean_extensions(self) -> str:
         """
-        � Carrega extensões da Clean Architecture
+        💡 Carrega extensões da Clean Architecture
 
         💡 Boa Prática: Carregamento modular e robusto!
         """
-        logger.info("� Carregando extensões da Clean Architecture...")
+        logger.info("💡 Carregando extensões da Clean Architecture...")
 
-        loaded = []
-        failed = []
+        loaded = []  # Armazena extensões carregadas
+        failed = []  # Armazena falhas de carregamento
 
         # Carrega comandos da Application Layer
         commands_dir = Path(__file__).parent / "application" / "commands"
@@ -111,7 +110,7 @@ class CleanArchitectureBot:
                         e,
                     )
 
-        # Carrega comando clean exemplar
+        # Exemplo para futuros comandos
         clean_commands_file = Path(__file__).parent / "clean_commands.py"
         if clean_commands_file.exists():
             try:
@@ -121,10 +120,11 @@ class CleanArchitectureBot:
             except (ImportError, ModuleNotFoundError, AttributeError) as e:
                 failed.append("clean_commands")
                 logger.warning("❌ Falha clean commands: %s", e)
+        # Fim do exemplo
 
-        status = f"� Clean Architecture: {len(loaded)} extensões carregadas"
+        status = f"✅ Clean Architecture: {len(loaded)} extensões carregadas"
         if failed:
-            status += f", {len(failed)} falharam"
+            status += f", ❌{len(failed)} falharam"
 
         return status
 
@@ -157,7 +157,6 @@ async def start() -> None:
     setup_logging()
 
     async with bot:
-        # 🔑 Carrega token
         try:
             token = config("TOKEN")
         except (KeyError, ValueError, TypeError):
@@ -167,7 +166,7 @@ async def start() -> None:
         # 🏗️ Inicializa arquitetura limpa
         clean_bot = CleanArchitectureBot(bot)
 
-        # � Carrega extensões da Clean Architecture
+        # 💡 Carrega extensões da Clean Architecture
         status = await clean_bot.load_clean_extensions()
         logger.info(status)
 
@@ -179,8 +178,6 @@ async def start() -> None:
 def main() -> None:
     """
     🎯 Ponto de entrada principal
-
-    💡 Boa Prática: Tratamento robusto de erros!
     """
     try:
         asyncio.run(start())

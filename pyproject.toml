@@ -5,11 +5,11 @@ description = "iesb"
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Izaac", email = "izaacjrrm@email.com" }]
-requires-python = "==3.13.5"
+requires-python = ">=3.13.0"
 dependencies = [
     "aiosqlite>=0.21.0",
     "discord.py>=2.3.0",
-    "pydantic>=2.11.7",
+    "pydantic>=2.11.7", 
     "python-decouple>=3.8",
     "sqlalchemy>=2.0.43",
     "tinydb>=4.8.2",
@@ -95,7 +95,7 @@ known-first-party = ["comandos"]
 # ============================
 [tool.pyright]
 typeCheckingMode = "strict"
-pythonVersion = "3.13"
+pythonVersion = "3.14"
 include = ["src", 'tests']
 exclude = [
     "**/venv",

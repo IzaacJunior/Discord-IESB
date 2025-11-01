@@ -1,12 +1,11 @@
 """
 🎮 Clean Architecture Manager - Presentation Layer
-💡 Boa Prática: Manager centralizado para comandos e tratamento de erros!
+💡 Boa Prática: Manager centralizado apenas para coordenação e eventos!
 """
 
 import logging
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 from presentation.controllers import ChannelController
@@ -16,30 +15,31 @@ logger = logging.getLogger(__name__)
 
 class BotErrorHandler:
     """
-    ❌ Gerenciador Central de Erros
+    ❌ Centraliza todo tratamento de erros da aplicação em um local dedicado!
 
-    💡 Boa Prática: Centraliza todo tratamento de erros
-    da aplicação em um local dedicado!
+    💡 Boa Prática: Separação de responsabilidades para tratamento de erros
     """
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self._setup_error_handlers()
 
     def _setup_error_handlers(self) -> None:
         """
-        ⚙️ Configura todos os tratadores de erro
-
-        💡 Boa Prática: Separação de responsabilidades!
+        ⚙️ Configura todos os tratadores de erro do bot
         """
 
+        # Tratador de erros de comandos tradicionais
         @self.bot.event
-        async def on_command_error(ctx, error):
-            """❌ Tratamento global de erros de comandos"""
+        async def on_command_error(ctx: commands.Context, error: Exception) -> None:
+            """❌ Tratamento global de erros de comandos com prefixo"""
             await self._handle_command_error(ctx, error)
 
+        # Tratador de erros de slash commands
         @self.bot.event
-        async def on_app_command_error(interaction, error):
+        async def on_app_command_error(
+            interaction: discord.Interaction, error: Exception
+        ) -> None:
             """❌ Tratamento de erros para slash commands"""
             await self._handle_app_command_error(interaction, error)
 
@@ -47,9 +47,9 @@ class BotErrorHandler:
         self, ctx: commands.Context, error: Exception
     ) -> None:
         """
-        🔧 Trata erros de comandos tradicionais
+        🔧 Trata erros de comandos tradicionais com mensagens amigáveis
 
-        💡 Boa Prática: Método dedicado para cada tipo de erro!
+        💡 Boa Prática: Logs específicos + feedback claro para usuários
         """
         from discord import Forbidden
         from discord.ext.commands import errors
@@ -60,7 +60,6 @@ class BotErrorHandler:
             else "Comando desconhecido"
         )
 
-        # 🤫 Ignora comandos não encontrados silenciosamente
         if isinstance(error, errors.CommandNotFound):
             return
 
@@ -103,7 +102,7 @@ class BotErrorHandler:
         self, interaction: discord.Interaction, error: Exception
     ) -> None:
         """
-        ⚡ Trata erros de slash commands
+        ⚡ Trata erros de slash commands com respostas ephemeral
 
         💡 Boa Prática: Tratamento específico para app commands!
         """
@@ -135,13 +134,18 @@ class BotErrorHandler:
 
 class CleanArchitectureManager:
     """
-    🏗️ Manager Principal da Clean Architecture
+    🏗️ Manager Principal - Apenas Coordenação e Eventos
 
-    💡 Boa Prática: Centraliza toda a configuração
-    e coordenação dos componentes!
+    💡 Boa Prática: Manager focado apenas em:
+    - ✅ Coordenação de eventos
+    - ✅ Configuração do bot
+    - ✅ Delegação para controllers
+    - ❌ SEM comandos (isso fica nos Cogs separados)
     """
 
-    def __init__(self, bot: commands.Bot, channel_controller: ChannelController):
+    def __init__(
+        self, bot: commands.Bot, channel_controller: ChannelController
+    ) -> None:
         self.bot = bot
         self.channel_controller = channel_controller
         self.error_handler = BotErrorHandler(bot)
@@ -149,145 +153,87 @@ class CleanArchitectureManager:
 
     def _setup_events(self) -> None:
         """
-        📝 Configura eventos do bot
+        📝 Configura apenas eventos essenciais do bot
 
-        💡 Boa Prática: Eventos organizados no manager!
+        💡 Boa Prática: Manager cuida só de eventos, não de comandos!
         """
 
         @self.bot.event
-        async def on_ready():
-            """✅ Bot conectado e pronto"""
+        async def on_ready() -> None:
+            """✅ Bot conectado e configurado"""
             logger.info(
                 "🤖 Bot conectado: %s (ID: %s)", self.bot.user.name, self.bot.user.id
             )
             logger.info("🌐 Conectado a %d servidores", len(self.bot.guilds))
 
-            # 🎮 Atualiza status
+            # 🎮 Define status personalizado
             activity = discord.Activity(
-                type=discord.ActivityType.watching, name="🏗️ Clean Architecture | !help"
+                type=discord.ActivityType.watching, name="Sistema NÃO oficial do IESB"
             )
             await self.bot.change_presence(activity=activity)
 
-            # Sincroniza comandos slash
+            # 🔄 Sincroniza comandos slash (gerenciados pelos Cogs)
             try:
                 await self.bot.tree.sync()
-                logger.info("✅ Comandos slash sincronizados!")
+                logger.info("✅ Comandos slash sincronizados com sucesso!")
             except Exception:
-                logger.exception("❌ Erro ao sincronizar comandos slash")
+                logger.exception("❌ Falha ao sincronizar comandos slash")
 
             logger.info("✨ Bot pronto para uso!")
 
         @self.bot.event
-        async def on_voice_state_update(member, before, after):
-            """🔊 Delegação para o controller de canais"""
+        async def on_voice_state_update(
+            member: discord.Member,
+            before: discord.VoiceState,
+            after: discord.VoiceState,
+        ) -> None:
+            """
+            🔊 Monitora mudanças de estado de voz
+
+            💡 Boa Prática: Manager apenas delega para o controller
+            """
             await self.channel_controller.handle_voice_state_update(
                 member, before, after
             )
 
         @self.bot.event
-        async def on_message(message):
-            """📝 Processa mensagens"""
+        async def on_message(message: discord.Message) -> None:
+            """
+            📝 Processa mensagens do chat
+
+            💡 Boa Prática: Processa comandos ANTES de deletar a mensagem!
+            """
             if message.author == self.bot.user:
                 return
 
-            # Remove comandos com prefixo para manter chat limpo
+            await self.bot.process_commands(message)
+
             if message.content.startswith(self.bot.command_prefix):
-                await message.delete()
+                try:
+                    await message.delete()
+                except discord.Forbidden:
+                    logger.warning("Sem permissão para deletar mensagem de comando")
+                except discord.NotFound:
+                    pass
 
 
-class CleanChannelCommands(commands.Cog):
+def create_manager(bot: commands.Bot) -> CleanArchitectureManager:
     """
-    🎮 Comandos de canal usando Clean Architecture
+    🏭 Factory function para criar o manager
 
-    💡 Boa Prática: Cog que delega operações para controllers!
+    💡 Boa Prática: Factory pattern + injeção de dependência
+
+    Args:
+        bot: Instância do bot Discord configurada
+
+    Returns:
+        Manager configurado apenas para coordenação
     """
-
-    def __init__(self, bot: commands.Bot, channel_controller: ChannelController):
-        self.bot = bot
-        self.channel_controller = channel_controller
-
-    @app_commands.command(
-        name="criar_texto",
-        description="🏗️ Cria um novo canal de texto usando Clean Architecture",
-    )
-    @app_commands.describe(
-        nome="Nome do canal de texto", topico="Tópico/descrição do canal (opcional)"
-    )
-    @app_commands.checks.has_permissions(manage_channels=True)
-    async def criar_canal_texto(
-        self, interaction: discord.Interaction, nome: str, topico: str | None = None
-    ):
-        """
-        💬 Comando para criar canal de texto
-
-        💡 Boa Prática: Validação na UI, lógica no Controller!
-        """
-        # Validação básica na UI
-        if len(nome) < 2 or len(nome) > 100:
-            await interaction.response.send_message(
-                "❌ Nome deve ter entre 2 e 100 caracteres!", ephemeral=True
-            )
-            return
-
-        # Delega para o controller
-        await self.channel_controller.handle_create_text_channel(
-            interaction, nome, topico
-        )
-
-    @app_commands.command(
-        name="criar_voz",
-        description="🔊 Cria um novo canal de voz usando Clean Architecture",
-    )
-    @app_commands.describe(
-        nome="Nome do canal de voz", limite="Limite de usuários (0 = ilimitado, máx 99)"
-    )
-    @app_commands.checks.has_permissions(manage_channels=True)
-    async def criar_canal_voz(
-        self, interaction: discord.Interaction, nome: str, limite: int = 0
-    ):
-        """
-        🔊 Comando para criar canal de voz
-
-        💡 Boa Prática: Separação clara de responsabilidades!
-        """
-        # Validação básica na UI
-        if len(nome) < 2 or len(nome) > 100:
-            await interaction.response.send_message(
-                "❌ Nome deve ter entre 2 e 100 caracteres!", ephemeral=True
-            )
-            return
-
-        # Delega para o controller
-        await self.channel_controller.handle_create_voice_channel(
-            interaction, nome, limite
-        )
-
-    @commands.Cog.listener()
-    async def on_voice_state_update(
-        self,
-        member: discord.Member,
-        before: discord.VoiceState,
-        after: discord.VoiceState,
-    ):
-        """
-        🔄 Evento de mudança de estado de voz
-
-        💡 Boa Prática: Evento delegado para o controller!
-        """
-        await self.channel_controller.handle_voice_state_update(member, before, after)
-
-
-async def setup(bot: commands.Bot):
-    """
-    ⚙️ Setup do Cog com injeção de dependência
-
-    💡 Boa Prática: Como fazer DI com cogs existentes!
-    """
-    # Aqui você precisaria acessar o container de DI
-    # Por enquanto vamos criar um exemplo simples
     from infrastructure.repositories import DiscordChannelRepository
 
+    # 🔧 Criação das dependências
     channel_repository = DiscordChannelRepository(bot)
     channel_controller = ChannelController(channel_repository)
 
-    await bot.add_cog(CleanChannelCommands(bot, channel_controller))
+    # 🎯 Manager puro (sem comandos)
+    return CleanArchitectureManager(bot, channel_controller)
