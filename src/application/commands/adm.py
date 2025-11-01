@@ -258,7 +258,11 @@ class ADM(commands.Cog):
         help="🏠 Marca categoria para criar fóruns privados únicos quando membro entrar"
     )
     @commands.has_permissions(administrator=True)
-    async def add_unique_channel_category(self, ctx: commands.Context) -> None:
+    async def add_unique_channel_category(
+        self, 
+        ctx: commands.Context,
+        category_name: str | None = None
+    ) -> None:
         """
         🏠 Marca categoria como geradora de fóruns únicos por membro.
         
@@ -267,18 +271,50 @@ class ADM(commands.Cog):
         ✨ NOVO: Cria salas para TODOS os membros existentes que não têm
         
         Funcionamento:
-        1. Admin usa comando em canal dentro de uma categoria
-        2. Categoria é marcada como "unique channel generator"
-        3. Sistema salva no banco de dados
-        4. 🎁 BÔNUS: Cria salas para membros que já estão no servidor (exceto bots)
-        5. Quando novos membros entrarem:
+        1. Admin usa comando em canal de texto: !+channel "Nome da Categoria"
+        2. OU usa sem parâmetro para usar categoria do canal atual
+        3. Categoria é marcada como "unique channel generator"
+        4. Sistema salva no banco de dados
+        5. 🎁 BÔNUS: Cria salas para membros que já estão no servidor (exceto bots)
+        6. Quando novos membros entrarem:
            - Verifica se JÁ tem canal nesta categoria
            - Se NÃO tem: cria fórum privado único
            - Se JÁ tem: ignora criação (evita duplicatas)
+           
+        Args:
+            category_name: Nome da categoria (opcional). Se não fornecido, usa categoria do canal atual
         """
-        # 🔍 Validação com método auxiliar reutilizável
-        if not (category := await self._validate_voice_state(ctx)):
-            return
+        # 🔍 STEP 1: Determina qual categoria usar
+        category = None
+        
+        if category_name:
+            # 💡 Busca categoria pelo nome fornecido
+            category = discord.utils.get(ctx.guild.categories, name=category_name)
+            
+            if not category:
+                await ctx.send(
+                    f"❌ Categoria **{category_name}** não encontrada!\n"
+                    f"💡 Verifique se o nome está correto (maiúsculas/minúsculas importam)",
+                    delete_after=10
+                )
+                return
+        else:
+            # 💡 Usa categoria do canal de texto atual
+            if not ctx.channel.category:
+                await ctx.send(
+                    "❌ Este canal não está em nenhuma categoria!\n"
+                    f"💡 Use: `!+channel \"Nome da Categoria\"` para especificar uma categoria",
+                    delete_after=10
+                )
+                return
+            
+            category = ctx.channel.category
+        
+        logger.info(
+            "🔍 Categoria selecionada: '%s' (ID: %s)",
+            category.name,
+            category.id
+        )
         
         try:
             # 🚀 Delega para o controller marcar categoria como unique channel generator
@@ -387,7 +423,11 @@ class ADM(commands.Cog):
         help="🗑️ Remove configuração de categoria de fóruns únicos"
     )
     @commands.has_permissions(administrator=True)
-    async def remove_unique_channel_category(self, ctx: commands.Context) -> None:
+    async def remove_unique_channel_category(
+        self,
+        ctx: commands.Context,
+        category_name: str | None = None
+    ) -> None:
         """
         🗑️ Remove marcação de categoria e limpa relacionamentos.
         
@@ -395,14 +435,46 @@ class ADM(commands.Cog):
         ⚠️ IMPORTANTE: NÃO deleta os canais, apenas remove configuração
         
         Funcionamento:
-        1. Admin usa comando em canal dentro da categoria
-        2. Categoria deixa de gerar fóruns únicos
-        3. Registros de canais existentes são mantidos
-        4. Sistema remove apenas a configuração do banco
+        1. Admin usa comando: !-channel "Nome da Categoria"
+        2. OU usa sem parâmetro para usar categoria do canal atual
+        3. Categoria deixa de gerar fóruns únicos
+        4. Registros de canais existentes são mantidos
+        5. Sistema remove apenas a configuração do banco
+        
+        Args:
+            category_name: Nome da categoria (opcional). Se não fornecido, usa categoria do canal atual
         """
-        # 🔍 Validação com método auxiliar reutilizável
-        if not (category := await self._validate_voice_state(ctx)):
-            return
+        # 🔍 STEP 1: Determina qual categoria usar
+        category = None
+        
+        if category_name:
+            # 💡 Busca categoria pelo nome fornecido
+            category = discord.utils.get(ctx.guild.categories, name=category_name)
+            
+            if not category:
+                await ctx.send(
+                    f"❌ Categoria **{category_name}** não encontrada!\n"
+                    f"💡 Verifique se o nome está correto (maiúsculas/minúsculas importam)",
+                    delete_after=10
+                )
+                return
+        else:
+            # 💡 Usa categoria do canal de texto atual
+            if not ctx.channel.category:
+                await ctx.send(
+                    "❌ Este canal não está em nenhuma categoria!\n"
+                    f"💡 Use: `!-channel \"Nome da Categoria\"` para especificar uma categoria",
+                    delete_after=10
+                )
+                return
+            
+            category = ctx.channel.category
+        
+        logger.info(
+            "🔍 Categoria selecionada para remoção: '%s' (ID: %s)",
+            category.name,
+            category.id
+        )
         
         try:
             # 🗑️ Delega para o controller remover categoria

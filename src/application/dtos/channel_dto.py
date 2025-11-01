@@ -6,7 +6,7 @@
 from __future__ import annotations  # 🆕 Python 3.13 - Forward references
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Any
 
 if TYPE_CHECKING:
     from domain.entities import ChannelType
@@ -30,6 +30,7 @@ class CreateChannelDTO:
     # 🔊 Campos específicos para canais de voz
     user_limit: int = 0  # 💖 Limite de usuários (0 = ilimitado)
     bitrate: int = 64000  # 💖 Taxa de bits padrão
+    overwrites: dict[Any, Any] | None = None  # 🔒 Permissões customizadas (roles/membros)
     
     # 💬 Campos específicos para canais de texto
     topic: str | None = None  # 💖 Tópico do canal

@@ -1,7 +1,9 @@
 import logging
+from pathlib import Path
 
 import discord
 
+from config import DB_PATH
 from domain.entities import Channel, TextChannel, VoiceChannel
 from domain.repositories import ChannelRepository
 
@@ -69,11 +71,21 @@ class DiscordChannelRepository(ChannelRepository):
         category_id: int | None = None,
         user_limit: int = 0,
         bitrate: int = 64000,
+        overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite] | None = None,
     ) -> VoiceChannel:
         """
         🔊 Cria um canal de voz no Discord
 
         💡 Boa Prática: Parâmetros com valores padrão sensatos!
+        🔒 Novo: Suporta cópia de permissões (overwrites) do canal original
+        
+        Args:
+            name: Nome do canal
+            guild_id: ID do servidor
+            category_id: ID da categoria (opcional)
+            user_limit: Limite de usuários (0 = sem limite)
+            bitrate: Taxa de bits para áudio
+            overwrites: Permissões específicas para roles/membros (opcional)
         """
         logger.info("🔊 Criando canal de voz: %s", name)
 
@@ -88,13 +100,21 @@ class DiscordChannelRepository(ChannelRepository):
             if not isinstance(category, discord.CategoryChannel):
                 category = None
 
-        # Cria o canal no Discord
+        # 🎨 Cria o canal no Discord com permissões customizadas
         discord_channel = await guild.create_voice_channel(
             name=name,
             category=category,
             user_limit=user_limit,
             bitrate=bitrate,
+            overwrites=overwrites,  # 🔒 Aplica permissões personalizadas
         )
+        
+        # 💡 Log das permissões aplicadas
+        if overwrites:
+            logger.debug(
+                "🔒 Canal criado com %d permissões customizadas",
+                len(overwrites)
+            )
 
         # Converte para entidade do domain
         return VoiceChannel(
@@ -406,7 +426,7 @@ class DiscordChannelRepository(ChannelRepository):
             logger.info("🔍 Verificando se categoria %s é temp generator", display_name)
             
             # 🔍 Conecta ao banco de dados
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -454,7 +474,7 @@ class DiscordChannelRepository(ChannelRepository):
             logger.info("💾 Marcando categoria %s como temp generator", category_name)
             
             # 💾 Salva no banco de dados
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 await db.execute(
                     """
@@ -503,7 +523,7 @@ class DiscordChannelRepository(ChannelRepository):
             logger.info("🗑️ Removendo marcação de categoria ID %s", category_id)
             
             # 🗑️ Remove do banco de dados (marca como inativa)
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -554,7 +574,7 @@ class DiscordChannelRepository(ChannelRepository):
             )
             
             # 🔍 Consulta banco de dados
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -607,7 +627,7 @@ class DiscordChannelRepository(ChannelRepository):
             logger.debug("🔍 Verificando se canal %s é temporário", channel_id)
             
             # 🔍 Consulta banco de dados
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -659,7 +679,7 @@ class DiscordChannelRepository(ChannelRepository):
                 category_id
             )
             
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -719,7 +739,7 @@ class DiscordChannelRepository(ChannelRepository):
                 guild_id
             )
             
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -787,7 +807,7 @@ class DiscordChannelRepository(ChannelRepository):
                 category_name
             )
             
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 # 🔍 STEP 1: Verifica se já existe categoria configurada nesta guilda
                 cursor = await db.execute(
@@ -870,7 +890,7 @@ class DiscordChannelRepository(ChannelRepository):
                 category_id
             )
             
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -930,7 +950,7 @@ class DiscordChannelRepository(ChannelRepository):
                 category_id
             )
             
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -1002,7 +1022,7 @@ class DiscordChannelRepository(ChannelRepository):
                 member_id
             )
             
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 try:
                     await db.execute(
@@ -1064,7 +1084,7 @@ class DiscordChannelRepository(ChannelRepository):
                 member_id
             )
             
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -1107,3 +1127,4 @@ class DiscordChannelRepository(ChannelRepository):
                 str(e)
             )
             return []
+

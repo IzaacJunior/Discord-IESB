@@ -4,7 +4,9 @@
 """
 
 import logging
+from pathlib import Path
 
+from config import DB_PATH
 from domain.entities import ChannelType, TextChannel, VoiceChannel
 from domain.repositories import ChannelRepository
 
@@ -80,6 +82,7 @@ class CreateChannelUseCase:
                     category_id=request.category_id,
                     user_limit=request.user_limit,
                     bitrate=request.bitrate,
+                    overwrites=request.overwrites,  # 🔒 Passa permissões customizadas
                 )
             else:
                 msg = f"Tipo de canal não suportado: {request.channel_type}"
@@ -149,7 +152,7 @@ class CreateChannelUseCase:
         try:
             logger.info("💾 Salvando canal temporário no banco: %s", channel_name)
             
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 await db.execute(
                     """
@@ -255,3 +258,4 @@ class ManageTemporaryChannelsUseCase:
             if success:
                 logger.info("✅ Canal vazio removido: %s", channel_id)
             return success
+

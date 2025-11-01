@@ -1,12 +1,13 @@
 ﻿"""
-🎮 Channel Controller - Presentation Layer
-Coordena eventos Discord com casos de uso da aplicação.
+?? Channel Controller - Presentation Layer
+Coordena eventos Discord com casos de uso da aplica��o.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 
 from application.dtos import CreateChannelDTO
 from application.use_cases import CreateChannelUseCase
+from config import DB_PATH
 from domain.entities import ChannelType
 from presentation.views import TempRoomControlView, create_temp_room_embed
 
@@ -28,8 +30,8 @@ class ChannelController:
     
     Responsabilidades:
     - Criar canais de texto e voz
-    - Gerenciar salas temporárias automáticas
-    - Coordenar eventos de voz (entrada/saída)
+    - Gerenciar salas tempor�rias autom�ticas
+    - Coordenar eventos de voz (entrada/sa�da)
     """
 
     def __init__(
@@ -47,11 +49,11 @@ class ChannelController:
         topic: str | None = None,
     ) -> None:
         """Cria canal de texto via comando slash."""
-        logger.info("💬 Processando criação de canal de texto: %s", name)
+        logger.info("?? Processando cria��o de canal de texto: %s", name)
 
         if not name or not name.strip():
             await interaction.response.send_message(
-                "❌ Nome do canal não pode estar vazio!",
+                "? Nome do canal n�o pode estar vazio!",
                 ephemeral=True,
             )
             return
@@ -70,25 +72,25 @@ class ChannelController:
             match result.created:
                 case True:
                     await interaction.response.send_message(
-                        f"✅ Canal de texto **{result.name}** criado com sucesso!",
+                        f"? Canal de texto **{result.name}** criado com sucesso!",
                         ephemeral=True,
                     )
                 case False:
                     if result.id > 0:
                         await interaction.response.send_message(
-                            f"⚠️ Canal **{result.name}** já existe! Não criado duplicata.",
+                            f"?? Canal **{result.name}** j� existe! N�o criado duplicata.",
                             ephemeral=True,
                         )
                     else:
                         await interaction.response.send_message(
-                            f"❌ Falha ao criar canal **{name}**. Tente novamente.",
+                            f"? Falha ao criar canal **{name}**. Tente novamente.",
                             ephemeral=True,
                         )
 
         except Exception as e:
-            logger.exception("❌ Erro inesperado ao criar canal: %s", name)
+            logger.exception("? Erro inesperado ao criar canal: %s", name)
             await interaction.response.send_message(
-                "❌ Erro interno do servidor. Tente novamente em alguns minutos.",
+                "? Erro interno do servidor. Tente novamente em alguns minutos.",
                 ephemeral=True,
             )
 
@@ -99,26 +101,26 @@ class ChannelController:
         user_limit: int = 0,
     ) -> None:
         """Cria canal de voz via comando slash."""
-        logger.info("🔊 Processando criação de canal de voz: %s", name)
+        logger.info("?? Processando cria��o de canal de voz: %s", name)
 
         if not name or not name.strip():
             await interaction.response.send_message(
-                "❌ Nome do canal não pode estar vazio!",
+                "? Nome do canal n�o pode estar vazio!",
                 ephemeral=True,
             )
             return
 
-        # Validação do limite de usuários
+        # Valida��o do limite de usu�rios
         match user_limit:
             case x if x < 0:
                 await interaction.response.send_message(
-                    "❌ Limite de usuários não pode ser negativo!",
+                    "? Limite de usu�rios n�o pode ser negativo!",
                     ephemeral=True,
                 )
                 return
             case x if x > 99:
                 await interaction.response.send_message(
-                    "❌ Limite máximo é 99 usuários!",
+                    "? Limite m�ximo � 99 usu�rios!",
                     ephemeral=True,
                 )
                 return
@@ -136,25 +138,25 @@ class ChannelController:
             match result.created:
                 case True:
                     await interaction.response.send_message(
-                        f"✅ Canal de voz **{result.name}** criado com sucesso!",
+                        f"? Canal de voz **{result.name}** criado com sucesso!",
                         ephemeral=True,
                     )
                 case False:
                     if result.id > 0:
                         await interaction.response.send_message(
-                            f"⚠️ Canal **{result.name}** já existe! Não criado duplicata.",
+                            f"?? Canal **{result.name}** j� existe! N�o criado duplicata.",
                             ephemeral=True,
                         )
                     else:
                         await interaction.response.send_message(
-                            f"❌ Falha ao criar canal **{name}**. Tente novamente.",
+                            f"? Falha ao criar canal **{name}**. Tente novamente.",
                             ephemeral=True,
                         )
 
         except Exception as e:
-            logger.exception("❌ Erro inesperado ao criar canal de voz: %s", name)
+            logger.exception("? Erro inesperado ao criar canal de voz: %s", name)
             await interaction.response.send_message(
-                "❌ Erro interno do servidor. Tente novamente em alguns minutos.",
+                "? Erro interno do servidor. Tente novamente em alguns minutos.",
                 ephemeral=True,
             )
 
@@ -164,33 +166,33 @@ class ChannelController:
         category_id: int | None = None
     ) -> bool:
         """
-        🏠 Cria fórum privado para novo membro
+        ?? Cria f�rum privado para novo membro
         
-        💡 Boa Prática: Fórum totalmente privado onde membro tem controle total!
-        🔒 Permissões: Apenas o membro pode ver, editar e gerenciar
+        ?? Boa Pr�tica: F�rum totalmente privado onde membro tem controle total!
+        ?? Permiss�es: Apenas o membro pode ver, editar e gerenciar
         
         Funcionalidades:
-        - ✅ Canal visível apenas para o membro
-        - ✅ Pode modificar nome do canal
-        - ✅ Pode gerenciar mensagens (deletar, editar)
-        - ✅ Pode criar threads privadas (posts privados)
-        - ❌ NÃO pode criar threads públicas
-        - ✅ Threads criadas herdam as mesmas permissões do fórum
+        - ? Canal vis�vel apenas para o membro
+        - ? Pode modificar nome do canal
+        - ? Pode gerenciar mensagens (deletar, editar)
+        - ? Pode criar threads privadas (posts privados)
+        - ? N�O pode criar threads p�blicas
+        - ? Threads criadas herdam as mesmas permiss�es do f�rum
         
         Args:
-            member: Membro que receberá o fórum privado
+            member: Membro que receber� o f�rum privado
             category_id: ID da categoria (opcional)
             
         Returns:
-            bool: True se fórum foi criado com sucesso
+            bool: True se f�rum foi criado com sucesso
         """
         try:
-            logger.info("🏠 Criando fórum privado para %s", member.display_name)
+            logger.info("?? Criando f�rum privado para %s", member.display_name)
 
-            # 🏗️ Gera nome do fórum baseado no membro
-            forum_name = f"🏠-{member.display_name.lower()}"
+            # ??? Gera nome do f�rum baseado no membro
+            forum_name = f"??-{member.display_name.lower()}"
             
-            # 🎯 Chama repository para criar fórum com permissões especiais
+            # ?? Chama repository para criar f�rum com permiss�es especiais
             forum_channel = await self.channel_repository.create_private_forum_channel(
                 name=forum_name,
                 guild_id=member.guild.id,
@@ -198,42 +200,42 @@ class ChannelController:
                 category_id=category_id,
             )
             
-            # 💬 Envia mensagem de boas-vindas no fórum
+            # ?? Envia mensagem de boas-vindas no f�rum
             try:
-                # Cria thread inicial com instruções
+                # Cria thread inicial com instru��es
                 welcome_thread = await forum_channel.create_thread(
-                    name="👋 Bem-vindo ao seu fórum!",
+                    name="?? Bem-vindo ao seu f�rum!",
                     content=(
-                        f"## 🎉 Olá, {member.mention}!\n\n"
-                        f"Este é o seu **fórum privado pessoal**! 🏠\n\n"
-                        f"### ✨ O que você pode fazer aqui:\n"
-                        f"- � **Criar threads privadas**: Clique em 'Nova Postagem' para criar tópicos privados\n"
-                        f"- ✏️ **Editar o nome**: Clique com botão direito no canal → 'Editar Canal'\n"
-                        f"- 🗑️ **Gerenciar mensagens**: Delete ou edite qualquer mensagem\n"
-                        f"- � **Privacidade total**: Apenas você pode ver este canal e seus posts!\n"
-                        f"- 🎨 **Personalizar**: Mude o nome, descrição, tags e tudo mais!\n\n"
-                        f"### 💡 Dicas:\n"
-                        f"- Use tags para organizar seus tópicos\n"
-                        f"- Threads são arquivadas automaticamente após 7 dias de inatividade\n"
-                        f"- Você tem controle total sobre este espaço! 💪\n"
-                        f"- ⚠️ **Importante**: Você só pode criar posts PRIVADOS (não públicos)\n\n"
-                        f"**Divirta-se organizando suas ideias!** ✨"
+                        f"## ?? Ol�, {member.mention}!\n\n"
+                        f"Este � o seu **f�rum privado pessoal**! ??\n\n"
+                        f"### ? O que voc� pode fazer aqui:\n"
+                        f"- ? **Criar threads privadas**: Clique em 'Nova Postagem' para criar t�picos privados\n"
+                        f"- ?? **Editar o nome**: Clique com bot�o direito no canal ? 'Editar Canal'\n"
+                        f"- ??? **Gerenciar mensagens**: Delete ou edite qualquer mensagem\n"
+                        f"- ? **Privacidade total**: Apenas voc� pode ver este canal e seus posts!\n"
+                        f"- ?? **Personalizar**: Mude o nome, descri��o, tags e tudo mais!\n\n"
+                        f"### ?? Dicas:\n"
+                        f"- Use tags para organizar seus t�picos\n"
+                        f"- Threads s�o arquivadas automaticamente ap�s 7 dias de inatividade\n"
+                        f"- Voc� tem controle total sobre este espa�o! ??\n"
+                        f"- ?? **Importante**: Voc� s� pode criar posts PRIVADOS (n�o p�blicos)\n\n"
+                        f"**Divirta-se organizando suas ideias!** ?"
                     ),
                 )
                 
                 logger.info(
-                    "✅ Thread de boas-vindas criada | thread=%s",
+                    "? Thread de boas-vindas criada | thread=%s",
                     welcome_thread.thread.name
                 )
                 
             except Exception as thread_error:
                 logger.warning(
-                    "⚠️ Não foi possível criar thread de boas-vindas: %s",
+                    "?? N�o foi poss�vel criar thread de boas-vindas: %s",
                     str(thread_error)
                 )
             
             logger.info(
-                "✅ Fórum privado criado | member=%s | forum=%s | id=%s",
+                "? F�rum privado criado | member=%s | forum=%s | id=%s",
                 member.display_name,
                 forum_channel.name,
                 forum_channel.id
@@ -243,15 +245,15 @@ class ChannelController:
             
         except Exception as e:
             logger.exception(
-                "❌ Erro ao criar fórum para membro %s: %s",
+                "? Erro ao criar f�rum para membro %s: %s",
                 member.display_name,
                 str(e)
             )
             return False
 
-    # ═══════════════════════════════════════════════════════════════
-    # 🎧 GERENCIAMENTO DE SALAS TEMPORÁRIAS
-    # ═══════════════════════════════════════════════════════════════
+    # ---------------------------------------------------------------
+    # ?? GERENCIAMENTO DE SALAS TEMPOR�RIAS
+    # ---------------------------------------------------------------
 
     async def handle_voice_state_update(
         self,
@@ -263,23 +265,23 @@ class ChannelController:
         Ponto de entrada principal para eventos de voz.
         
         Fluxo:
-        - Entrada em canal → Cria sala temporária se categoria for geradora
-        - Saída de canal → Remove sala se ficou vazia
+        - Entrada em canal ? Cria sala tempor�ria se categoria for geradora
+        - Sa�da de canal ? Remove sala se ficou vazia
         """
         try:
             # Entrada em novo canal
             if after.channel and after.channel.category and before.channel != after.channel:
                 logger.debug(
-                    "📥 ENTRADA: %s → '%s'",
+                    "?? ENTRADA: %s ? '%s'",
                     member.display_name,
                     after.channel.name
                 )
                 await self._handle_channel_entry(member, after)
 
-            # Saída de canal
+            # Sa�da de canal
             if before.channel and before.channel != after.channel:
                 logger.debug(
-                    "� SAÍDA: %s ← '%s'",
+                    "? SA�DA: %s ? '%s'",
                     member.display_name,
                     before.channel.name
                 )
@@ -288,7 +290,7 @@ class ChannelController:
             return True
 
         except Exception as e:
-            logger.error("❌ Erro em handle_voice_state_update: %s", str(e))
+            logger.error("? Erro em handle_voice_state_update: %s", str(e))
             return False
 
     async def _handle_channel_entry(
@@ -300,20 +302,20 @@ class ChannelController:
         Processa entrada em canal de voz.
         
         Verifica:
-        1. Se já está em sala temporária → Ignora
-        2. Se categoria é geradora → Cria sala temporária
+        1. Se j� est� em sala tempor�ria ? Ignora
+        2. Se categoria � geradora ? Cria sala tempor�ria
         """
         if not after.channel:
             return False
 
         logger.info(
-            "� SOLICITAÇÃO: %s entrou no canal '%s' (ID: %s)",
+            "? SOLICITA��O: %s entrou no canal '%s' (ID: %s)",
             member.display_name,
             after.channel.name,
             after.channel.id
         )
 
-        # CHECK 1: Já está em sala temporária?
+        # CHECK 1: J� est� em sala tempor�ria?
         is_temp_channel = await self.channel_repository.is_temporary_channel(
             channel_id=after.channel.id,
             guild_id=member.guild.id
@@ -321,14 +323,14 @@ class ChannelController:
 
         if is_temp_channel:
             logger.info(
-                "⏭️ IGNORADO: %s entrou em sala temporária existente",
+                "?? IGNORADO: %s entrou em sala tempor�ria existente",
                 member.display_name
             )
             return True
 
-        # CHECK 2: Categoria é geradora?
+        # CHECK 2: Categoria � geradora?
         if not after.channel.category:
-            logger.debug("⏭️ IGNORADO: Canal sem categoria")
+            logger.debug("?? IGNORADO: Canal sem categoria")
             return False
 
         is_generator_category = await self.channel_repository.is_temp_room_category(
@@ -339,14 +341,14 @@ class ChannelController:
 
         if not is_generator_category:
             logger.info(
-                "⏭️ IGNORADO: Categoria '%s' não é geradora",
+                "?? IGNORADO: Categoria '%s' n�o � geradora",
                 after.channel.category.name
             )
             return False
 
-        # Categoria é geradora → Cria sala temporária
+        # Categoria � geradora ? Cria sala tempor�ria
         logger.info(
-            "🎯 ACEITO: Criando sala temporária para %s",
+            "?? ACEITO: Criando sala tempor�ria para %s",
             member.display_name
         )
         return await self._create_temporary_room(member, after)
@@ -356,11 +358,34 @@ class ChannelController:
         member: discord.Member,
         after: discord.VoiceState
     ) -> bool:
-        """Cria sala temporária para o membro."""
+        """
+        Cria sala tempor�ria para o membro.
+        
+        ?? Boa Pr�tica: Clona TODAS as configura��es do canal gerador!
+        ?? Inclui: nome, limite, bitrate E permiss�es de roles
+        """
         try:
             parent_channel = after.channel
             
-            # Cria DTO de criação
+            # ?? Copia as permiss�es (overwrites) do canal gerador
+            # ?? Isso garante que roles como "tecno" tenham as mesmas permiss�es
+            overwrites = parent_channel.overwrites.copy()
+            
+            # ? Adiciona permiss�es especiais para o dono da sala
+            overwrites[member] = discord.PermissionOverwrite(
+                connect=True,
+                speak=True,
+                stream=True,
+                manage_channels=True,  # ?? Pode editar configura��es da sala
+            )
+            
+            logger.debug(
+                "?? Copiando %d permiss�es do canal gerador '%s'",
+                len(parent_channel.overwrites),
+                parent_channel.name
+            )
+            
+            # Cria DTO de cria��o com TODAS as configura��es
             create_dto = CreateChannelDTO(
                 name=f"{parent_channel.name} - {member.display_name}",
                 channel_type=ChannelType.VOICE,
@@ -369,71 +394,81 @@ class ChannelController:
                 member_id=member.id,
                 is_temporary=True,
                 user_limit=parent_channel.user_limit,
-                bitrate=parent_channel.bitrate
+                bitrate=parent_channel.bitrate,
+                overwrites=overwrites,  # ?? Passa permiss�es clonadas + dono
             )
 
             logger.info(
-                "✨ Criando sala temporária '%s' para %s",
+                "? Criando sala tempor�ria '%s' para %s (clone completo)",
                 create_dto.name,
                 member.display_name
             )
 
-            # Executa criação
+            # Executa cria��o
             result = await self.create_channel_use_case.execute(create_dto)
 
             if result.id > 0:
-                # Move usuário para nova sala
+                # ?? Envia embed com controles ANTES de mover (evita duplicatas)
+                # ?? Boa Pr�tica: Envia embed APENAS se sala foi CRIADA (result.created = True)
                 new_channel = member.guild.get_channel(result.id)
+                
                 if new_channel and isinstance(new_channel, discord.VoiceChannel):
+                    # ? Verifica se sala foi REALMENTE criada nesta chamada
+                    if result.created:
+                        try:
+                            # Cria embed informativa
+                            embed = create_temp_room_embed(new_channel, member)
+                            
+                            # Cria view com bot�es de controle
+                            view = TempRoomControlView(
+                                voice_channel=new_channel,
+                                owner_id=member.id,
+                                timeout=None  # View nunca expira
+                            )
+                            
+                            # ?? Envia diretamente no canal de voz (como mensagem inicial)
+                            await new_channel.send(
+                                content=f"?? {member.mention} Bem-vindo � sua sala tempor�ria!",
+                                embed=embed,
+                                view=view
+                            )
+                            
+                            logger.info(
+                                "?? Embed de controle enviada APENAS na cria��o | canal_voz=%s",
+                                new_channel.name
+                            )
+                        
+                        except Exception as embed_error:
+                            logger.error(
+                                "? Erro ao enviar embed de controle: %s",
+                                str(embed_error)
+                            )
+                            # N�o falha a cria��o da sala se embed der erro
+                    else:
+                        logger.debug(
+                            "?? Sala j� existia, embed N�O enviada | canal=%s",
+                            new_channel.name
+                        )
+                    
+                    # ?? Move usu�rio para sala (depois da embed)
                     await member.move_to(new_channel)
                     logger.info(
-                        "✅ %s movido para sala '%s' (ID: %s)",
+                        "? %s movido para sala '%s' (ID: %s)",
                         member.display_name,
                         new_channel.name,
                         new_channel.id
                     )
                     
-                    # 🎨 Envia embed com controles da sala DIRETAMENTE NO CANAL DE VOZ
-                    try:
-                        # Cria embed informativa
-                        embed = create_temp_room_embed(new_channel, member)
-                        
-                        # Cria view com botões de controle
-                        view = TempRoomControlView(
-                            voice_channel=new_channel,
-                            owner_id=member.id,
-                            timeout=None  # View nunca expira
-                        )
-                        
-                        # 💡 Envia diretamente no canal de voz (como mensagem inicial)
-                        await new_channel.send(
-                            content=f"🎉 {member.mention} Bem-vindo à sua sala temporária!",
-                            embed=embed,
-                            view=view
-                        )
-                        
-                        logger.info(
-                            "🎨 Embed de controle enviada | canal_voz=%s",
-                            new_channel.name
-                        )
-                    
-                    except Exception as embed_error:
-                        logger.error(
-                            "❌ Erro ao enviar embed de controle: %s",
-                            str(embed_error)
-                        )
-                        # Não falha a criação da sala se embed der erro
-                    
                     return True
                 else:
-                    logger.error("❌ Canal ID %s não encontrado", result.id)
+                    logger.error("? Canal ID %s n�o encontrado", result.id)
                     return False
             else:
-                logger.error("❌ Falha ao criar sala para %s", member.display_name)
+                logger.error("? Falha ao criar sala para %s", member.display_name)
                 return False
 
         except Exception as e:
-            logger.error("❌ Erro ao criar sala temporária: %s", str(e))
+            logger.error("? Erro ao criar sala tempor�ria: %s", str(e))
             return False
 
     async def _handle_channel_exit(
@@ -442,20 +477,20 @@ class ChannelController:
         before: discord.VoiceState
     ) -> bool:
         """
-        Processa saída de canal de voz.
-        Remove sala temporária se ficou vazia após 3 segundos.
+        Processa sa�da de canal de voz.
+        Remove sala tempor�ria se ficou vazia ap�s 3 segundos.
         """
         if not before.channel:
             return False
 
         logger.debug(
-            "🚪 %s saiu do canal '%s' (ID: %s)",
+            "?? %s saiu do canal '%s' (ID: %s)",
             member.display_name,
             before.channel.name,
             before.channel.id
         )
 
-        # Verifica se é sala temporária
+        # Verifica se � sala tempor�ria
         is_temp_channel = await self.channel_repository.is_temporary_channel(
             channel_id=before.channel.id,
             guild_id=member.guild.id
@@ -463,52 +498,52 @@ class ChannelController:
 
         if not is_temp_channel:
             logger.debug(
-                "ℹ️ Canal '%s' não é temporário, ignorando",
+                "?? Canal '%s' n�o � tempor�rio, ignorando",
                 before.channel.name
             )
             return False
 
-        # Verifica se está vazio
+        # Verifica se est� vazio
         channel_is_empty = len(before.channel.members) == 0
 
         if not channel_is_empty:
             logger.debug(
-                "ℹ️ Sala temporária '%s' ainda tem %d membros",
+                "?? Sala tempor�ria '%s' ainda tem %d membros",
                 before.channel.name,
                 len(before.channel.members)
             )
             return False
 
-        # Sala está vazia → Aguarda 3s antes de deletar
+        # Sala est� vazia ? Aguarda 3s antes de deletar
         logger.info(
-            "🗑️ Sala temporária '%s' ficou vazia. Aguardando 3s antes de deletar...",
+            "??? Sala tempor�ria '%s' ficou vazia. Aguardando 3s antes de deletar...",
             before.channel.name
         )
 
         await asyncio.sleep(3)
 
-        # Verifica novamente após aguardar
+        # Verifica novamente ap�s aguardar
         try:
             channel_check = member.guild.get_channel(before.channel.id)
 
             if channel_check is None:
                 logger.debug(
-                    "ℹ️ Canal '%s' já foi removido",
+                    "?? Canal '%s' j� foi removido",
                     before.channel.name
                 )
                 return True
 
             if len(channel_check.members) > 0:
                 logger.debug(
-                    "ℹ️ Canal '%s' não está mais vazio (%d membros), mantendo",
+                    "?? Canal '%s' n�o est� mais vazio (%d membros), mantendo",
                     channel_check.name,
                     len(channel_check.members)
                 )
                 return True
 
-            # Confirma vazio → Deleta
+            # Confirma vazio ? Deleta
             logger.info(
-                "🗑️ Confirmado vazio após 3s. Deletando: '%s'",
+                "??? Confirmado vazio ap�s 3s. Deletando: '%s'",
                 channel_check.name
             )
 
@@ -521,26 +556,26 @@ class ChannelController:
 
             # Remove do Discord
             await channel_check.delete(
-                reason=f"Sala temporária vazia - último usuário: {member.display_name}"
+                reason=f"Sala tempor�ria vazia - �ltimo usu�rio: {member.display_name}"
             )
 
             logger.info(
-                "✅ Sala temporária '%s' removida com sucesso",
+                "? Sala tempor�ria '%s' removida com sucesso",
                 channel_check.name
             )
             return True
 
         except Exception as delete_error:
             logger.error(
-                "❌ Erro ao deletar canal '%s': %s",
+                "? Erro ao deletar canal '%s': %s",
                 before.channel.name,
                 str(delete_error)
             )
             return False
 
-    # ═══════════════════════════════════════════════════════════════
-    # 🏷️ GERENCIAMENTO DE CATEGORIAS GERADORAS
-    # ═══════════════════════════════════════════════════════════════
+    # ---------------------------------------------------------------
+    # ??? GERENCIAMENTO DE CATEGORIAS GERADORAS
+    # ---------------------------------------------------------------
 
     async def handle_mark_category_as_temp_generator(
         self,
@@ -548,20 +583,20 @@ class ChannelController:
         guild_id: int
     ) -> bool:
         """
-        Marca categoria como geradora de salas temporárias.
-        Quando alguém entrar em canal dessa categoria, cria sala temporária.
+        Marca categoria como geradora de salas tempor�rias.
+        Quando algu�m entrar em canal dessa categoria, cria sala tempor�ria.
         """
         try:
-            logger.info("🎙️ Marcando categoria '%s' como geradora", category.name)
+            logger.info("??? Marcando categoria '%s' como geradora", category.name)
 
-            # Verifica se já está marcada
+            # Verifica se j� est� marcada
             is_already_marked = await self.channel_repository.is_temp_room_category(
                 category_id=category.id,
                 guild_id=guild_id
             )
 
             if is_already_marked:
-                logger.warning("⚠️ Categoria '%s' já está marcada", category.name)
+                logger.warning("?? Categoria '%s' j� est� marcada", category.name)
                 return False
 
             # Marca categoria
@@ -572,14 +607,14 @@ class ChannelController:
             )
 
             if success:
-                logger.info("✅ Categoria '%s' marcada como geradora", category.name)
+                logger.info("? Categoria '%s' marcada como geradora", category.name)
             else:
-                logger.error("❌ Falha ao marcar categoria '%s'", category.name)
+                logger.error("? Falha ao marcar categoria '%s'", category.name)
 
             return success
 
         except Exception as e:
-            logger.error("❌ Erro ao marcar categoria: %s", str(e))
+            logger.error("? Erro ao marcar categoria: %s", str(e))
             return False
 
     async def handle_unmark_category_as_temp_generator(
@@ -588,74 +623,74 @@ class ChannelController:
         guild_id: int
     ) -> bool:
         """
-        🗑️ Remove marcação de categoria e deleta todas salas temporárias
+        ??? Remove marca��o de categoria e deleta todas salas tempor�rias
         
-        💡 Boa Prática: Operação atômica - desmarcar + limpar canais
-        💡 Python 3.13: Pattern matching para status de limpeza
+        ?? Boa Pr�tica: Opera��o at�mica - desmarcar + limpar canais
+        ?? Python 3.13: Pattern matching para status de limpeza
         
         Returns:
             bool: True se categoria foi desmarcada (independente de haver canais)
         """
         try:
-            logger.info("🗑️ Removendo marcação de categoria ID %s", category_id)
+            logger.info("??? Removendo marca��o de categoria ID %s", category_id)
 
-            # 🔍 Primeiro busca todos os canais temporários dessa categoria
+            # ?? Primeiro busca todos os canais tempor�rios dessa categoria
             channel_ids = await self.channel_repository.get_temp_channels_by_category(
                 category_id=category_id,
                 guild_id=guild_id
             )
 
-            # 🧹 Deleta todos os canais temporários encontrados
+            # ?? Deleta todos os canais tempor�rios encontrados
             deleted_count = 0
             if channel_ids:
                 logger.info(
-                    "🧹 Deletando %d canais temporários da categoria %s",
+                    "?? Deletando %d canais tempor�rios da categoria %s",
                     len(channel_ids),
                     category_id
                 )
                 
                 for channel_id in channel_ids:
                     try:
-                        # 🗑️ Deleta canal do Discord
+                        # ??? Deleta canal do Discord
                         success = await self.channel_repository.delete_channel(
                             channel_id=channel_id
                         )
                         
                         if success:
                             deleted_count += 1
-                            logger.debug("✅ Canal %s deletado", channel_id)
+                            logger.debug("? Canal %s deletado", channel_id)
                         else:
                             logger.warning(
-                                "⚠️ Canal %s não encontrado no Discord", 
+                                "?? Canal %s n�o encontrado no Discord", 
                                 channel_id
                             )
                             
                     except Exception as channel_error:
                         logger.error(
-                            "❌ Erro ao deletar canal %s: %s",
+                            "? Erro ao deletar canal %s: %s",
                             channel_id,
                             str(channel_error)
                         )
                 
-                # 💬 Log do resultado da limpeza com pattern matching
+                # ?? Log do resultado da limpeza com pattern matching
                 match deleted_count:
                     case 0:
-                        logger.warning("⚠️ Nenhum canal foi deletado")
+                        logger.warning("?? Nenhum canal foi deletado")
                     case count if count == len(channel_ids):
                         logger.info(
-                            "✅ Todos os %d canais deletados com sucesso!", 
+                            "? Todos os %d canais deletados com sucesso!", 
                             count
                         )
                     case count:
                         logger.warning(
-                            "⚠️ Apenas %d de %d canais foram deletados",
+                            "?? Apenas %d de %d canais foram deletados",
                             count,
                             len(channel_ids)
                         )
             else:
-                logger.info("💡 Nenhum canal temporário encontrado na categoria")
+                logger.info("?? Nenhum canal tempor�rio encontrado na categoria")
 
-            # 🗑️ Remove marcação da categoria (independente dos canais)
+            # ??? Remove marca��o da categoria (independente dos canais)
             success = await self.channel_repository.unmark_category_as_temp_generator(
                 category_id=category_id,
                 guild_id=guild_id
@@ -663,23 +698,23 @@ class ChannelController:
 
             if success:
                 logger.info(
-                    "✅ Categoria ID %s desmarcada | Canais deletados: %d/%d",
+                    "? Categoria ID %s desmarcada | Canais deletados: %d/%d",
                     category_id,
                     deleted_count,
                     len(channel_ids)
                 )
             else:
-                logger.warning("⚠️ Categoria ID %s não estava marcada", category_id)
+                logger.warning("?? Categoria ID %s n�o estava marcada", category_id)
 
             return success
 
         except Exception as e:
-            logger.error("❌ Erro ao desmarcar categoria: %s", str(e))
+            logger.error("? Erro ao desmarcar categoria: %s", str(e))
             return False
 
-    # ═══════════════════════════════════════════════════════════════
-    # 🏠 GERENCIAMENTO DE FÓRUNS ÚNICOS POR MEMBRO
-    # ═══════════════════════════════════════════════════════════════
+    # ---------------------------------------------------------------
+    # ?? GERENCIAMENTO DE F�RUNS �NICOS POR MEMBRO
+    # ---------------------------------------------------------------
 
     async def handle_mark_category_as_unique_generator(
         self,
@@ -687,21 +722,21 @@ class ChannelController:
         guild_id: int
     ) -> bool:
         """
-        🏠 Marca categoria como geradora de fóruns únicos por membro.
+        ?? Marca categoria como geradora de f�runs �nicos por membro.
         
-        💡 Quando membro entra no servidor, cria UM fórum privado nesta categoria
-        🔒 Sistema inteligente evita duplicatas
+        ?? Quando membro entra no servidor, cria UM f�rum privado nesta categoria
+        ?? Sistema inteligente evita duplicatas
         
         Returns:
             bool: True se categoria foi marcada com sucesso
         """
         try:
             logger.info(
-                "🏠 Marcando categoria '%s' para fóruns únicos",
+                "?? Marcando categoria '%s' para f�runs �nicos",
                 category.name
             )
 
-            # 💾 Marca categoria no banco de dados
+            # ?? Marca categoria no banco de dados
             success = await self.channel_repository.mark_category_as_unique_generator(
                 category_id=category.id,
                 category_name=category.name,
@@ -710,12 +745,12 @@ class ChannelController:
 
             if success:
                 logger.info(
-                    "✅ Categoria '%s' marcada para fóruns únicos",
+                    "? Categoria '%s' marcada para f�runs �nicos",
                     category.name
                 )
             else:
                 logger.warning(
-                    "⚠️ Categoria '%s' já estava marcada",
+                    "?? Categoria '%s' j� estava marcada",
                     category.name
                 )
 
@@ -723,7 +758,7 @@ class ChannelController:
 
         except Exception as e:
             logger.exception(
-                "❌ Erro ao marcar categoria para fóruns únicos: %s",
+                "? Erro ao marcar categoria para f�runs �nicos: %s",
                 str(e)
             )
             return False
@@ -734,20 +769,20 @@ class ChannelController:
         guild_id: int
     ) -> bool:
         """
-        🗑️ Remove marcação de categoria como geradora de fóruns únicos.
+        ??? Remove marca��o de categoria como geradora de f�runs �nicos.
         
-        💡 Remove apenas configuração, mantém canais existentes
+        ?? Remove apenas configura��o, mant�m canais existentes
         
         Returns:
             bool: True se categoria foi desmarcada
         """
         try:
             logger.info(
-                "🗑️ Removendo marcação de categoria ID %s",
+                "??? Removendo marca��o de categoria ID %s",
                 category_id
             )
 
-            # 🗑️ Remove marcação do banco
+            # ??? Remove marca��o do banco
             success = await self.channel_repository.unmark_category_as_unique_generator(
                 category_id=category_id,
                 guild_id=guild_id
@@ -755,12 +790,12 @@ class ChannelController:
 
             if success:
                 logger.info(
-                    "✅ Categoria ID %s desmarcada",
+                    "? Categoria ID %s desmarcada",
                     category_id
                 )
             else:
                 logger.warning(
-                    "⚠️ Categoria ID %s não estava marcada",
+                    "?? Categoria ID %s n�o estava marcada",
                     category_id
                 )
 
@@ -768,7 +803,7 @@ class ChannelController:
 
         except Exception as e:
             logger.error(
-                "❌ Erro ao desmarcar categoria: %s",
+                "? Erro ao desmarcar categoria: %s",
                 str(e)
             )
             return False
@@ -779,26 +814,26 @@ class ChannelController:
         category_id: int
     ) -> bool:
         """
-        🏠 Cria fórum privado único para membro em categoria específica.
+        ?? Cria f�rum privado �nico para membro em categoria espec�fica.
         
-        💡 Boa Prática: Verifica duplicatas ANTES de criar
-        🔒 Sistema inteligente evita múltiplos canais na mesma categoria
+        ?? Boa Pr�tica: Verifica duplicatas ANTES de criar
+        ?? Sistema inteligente evita m�ltiplos canais na mesma categoria
         
         Fluxo:
-        1. Verifica se membro JÁ tem canal nesta categoria
-        2. Se JÁ tem: ignora criação (retorna True silenciosamente)
-        3. Se NÃO tem: cria fórum privado único
+        1. Verifica se membro J� tem canal nesta categoria
+        2. Se J� tem: ignora cria��o (retorna True silenciosamente)
+        3. Se N�O tem: cria f�rum privado �nico
         4. Registra relacionamento no banco de dados
         
         Args:
-            member: Membro que receberá o fórum
+            member: Membro que receber� o f�rum
             category_id: ID da categoria configurada
             
         Returns:
-            bool: True se canal foi criado ou já existe
+            bool: True se canal foi criado ou j� existe
         """
         try:
-            # 🔍 CHECK 1: Membro já tem canal nesta categoria?
+            # ?? CHECK 1: Membro j� tem canal nesta categoria?
             already_has_channel = await self.channel_repository.member_has_unique_channel_in_category(
                 member_id=member.id,
                 category_id=category_id,
@@ -807,22 +842,22 @@ class ChannelController:
 
             if already_has_channel:
                 logger.info(
-                    "⏭️ IGNORADO: Membro %s já tem canal único na categoria %s",
+                    "?? IGNORADO: Membro %s j� tem canal �nico na categoria %s",
                     member.display_name,
                     category_id
                 )
-                return True  # Não é erro, apenas já existe
+                return True  # N�o � erro, apenas j� existe
 
-            # 🏗️ Cria fórum privado único
+            # ??? Cria f�rum privado �nico
             logger.info(
-                "🏠 Criando fórum único para %s na categoria %s",
+                "?? Criando f�rum �nico para %s na categoria %s",
                 member.display_name,
                 category_id
             )
 
-            forum_name = f"🏠-{member.display_name.lower()}"
+            forum_name = f"??-{member.display_name.lower()}"
 
-            # 🎯 Chama repository para criar fórum
+            # ?? Chama repository para criar f�rum
             forum_channel = await self.channel_repository.create_private_forum_channel(
                 name=forum_name,
                 guild_id=member.guild.id,
@@ -830,7 +865,7 @@ class ChannelController:
                 category_id=category_id
             )
 
-            # 💾 Registra no banco de dados
+            # ?? Registra no banco de dados
             registered = await self.channel_repository.register_member_unique_channel(
                 member_id=member.id,
                 channel_id=forum_channel.id,
@@ -841,61 +876,61 @@ class ChannelController:
 
             if registered:
                 logger.info(
-                    "✅ Fórum único criado e registrado | member=%s | channel=%s | category=%s",
+                    "? F�rum �nico criado e registrado | member=%s | channel=%s | category=%s",
                     member.display_name,
                     forum_channel.name,
                     category_id
                 )
 
-                # 💬 Envia mensagem de boas-vindas no fórum
+                # ?? Envia mensagem de boas-vindas no f�rum
                 try:
                     welcome_thread = await forum_channel.create_thread(
-                        name="👋 Bem-vindo ao seu espaço único!",
+                        name="?? Bem-vindo ao seu espa�o �nico!",
                         content=(
-                            f"## 🎉 Olá, {member.mention}!\n\n"
-                            f"Este é o seu **fórum privado único**! 🏠\n\n"
-                            f"### ✨ Características especiais:\n"
-                            f"- 🔒 **Totalmente privado**: Apenas você pode ver!\n"
-                            f"- ✏️ **Personalizável**: Edite nome, descrição e tudo mais\n"
-                            f"- 📝 **Organize suas ideias**: Crie posts privados\n"
-                            f"- 🗑️ **Controle total**: Gerencie todas as mensagens\n"
-                            f"- ♻️ **Único**: Este é seu ÚNICO fórum nesta categoria!\n\n"
-                            f"**Aproveite seu espaço pessoal!** ✨"
+                            f"## ?? Ol�, {member.mention}!\n\n"
+                            f"Este � o seu **f�rum privado �nico**! ??\n\n"
+                            f"### ? Caracter�sticas especiais:\n"
+                            f"- ?? **Totalmente privado**: Apenas voc� pode ver!\n"
+                            f"- ?? **Personaliz�vel**: Edite nome, descri��o e tudo mais\n"
+                            f"- ?? **Organize suas ideias**: Crie posts privados\n"
+                            f"- ??? **Controle total**: Gerencie todas as mensagens\n"
+                            f"- ?? **�nico**: Este � seu �NICO f�rum nesta categoria!\n\n"
+                            f"**Aproveite seu espa�o pessoal!** ?"
                         ),
                     )
-                    logger.debug("✅ Thread de boas-vindas criada")
+                    logger.debug("? Thread de boas-vindas criada")
                 except Exception as thread_error:
                     logger.warning(
-                        "⚠️ Não foi possível criar thread de boas-vindas: %s",
+                        "?? N�o foi poss�vel criar thread de boas-vindas: %s",
                         str(thread_error)
                     )
 
                 return True
             else:
                 logger.error(
-                    "❌ Fórum criado mas não foi registrado no banco",
+                    "? F�rum criado mas n�o foi registrado no banco",
                 )
                 return False
 
         except Exception as e:
             logger.exception(
-                "❌ Erro ao criar fórum único para %s: %s",
+                "? Erro ao criar f�rum �nico para %s: %s",
                 member.display_name,
                 str(e)
             )
             return False
 
-    # ═══════════════════════════════════════════════════════════════
-    # 🧹 LIMPEZA E MANUTENÇÃO
-    # ═══════════════════════════════════════════════════════════════
+    # ---------------------------------------------------------------
+    # ?? LIMPEZA E MANUTEN��O
+    # ---------------------------------------------------------------
 
     async def _remove_temp_channel_from_database(self, channel_id: int, channel_name: str = "", category_name: str = "") -> bool:
-        """Marca canal temporário como inativo no banco de dados."""
+        """Marca canal tempor�rio como inativo no banco de dados."""
         import aiosqlite
         from pathlib import Path
 
         try:
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 await db.execute(
                     """
@@ -908,7 +943,7 @@ class ChannelController:
                 await db.commit()
 
             logger.info(
-                "💾 Canal temporário marcado como inativo | Nome: '%s' | Categoria: '%s' | ID: %s",
+                "?? Canal tempor�rio marcado como inativo | Nome: '%s' | Categoria: '%s' | ID: %s",
                 channel_name or "Desconhecido",
                 category_name or "Desconhecida",
                 channel_id
@@ -916,12 +951,12 @@ class ChannelController:
             return True
 
         except Exception as e:
-            logger.error("❌ Erro ao remover canal do banco: %s", str(e))
+            logger.error("? Erro ao remover canal do banco: %s", str(e))
             return False
 
     async def cleanup_all_temp_channels(self, guild: discord.Guild) -> int:
         """
-        Remove todas as salas temporárias do servidor.
+        Remove todas as salas tempor�rias do servidor.
         Chamado quando bot desconecta.
         """
         import aiosqlite
@@ -930,9 +965,9 @@ class ChannelController:
         removed_count = 0
 
         try:
-            logger.info("🧹 Iniciando limpeza de todas as salas temporárias...")
+            logger.info("?? Iniciando limpeza de todas as salas tempor�rias...")
 
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -944,7 +979,7 @@ class ChannelController:
                 )
                 temp_channels = await cursor.fetchall()
 
-                logger.info(f"📋 Encontradas {len(temp_channels)} salas temporárias ativas")
+                logger.info(f"?? Encontradas {len(temp_channels)} salas tempor�rias ativas")
 
                 # Remove cada sala
                 for channel_id, channel_name in temp_channels:
@@ -952,8 +987,8 @@ class ChannelController:
                         channel = guild.get_channel(channel_id)
                         if channel:
                             category_name = channel.category.name if channel.category else "Sem categoria"
-                            await channel.delete(reason="Limpeza automática - Bot desconectando")
-                            logger.info(f"✅ Sala removida: '{channel_name}' (Categoria: '{category_name}')")
+                            await channel.delete(reason="Limpeza autom�tica - Bot desconectando")
+                            logger.info(f"? Sala removida: '{channel_name}' (Categoria: '{category_name}')")
                             removed_count += 1
                             
                             await self._remove_temp_channel_from_database(
@@ -968,12 +1003,13 @@ class ChannelController:
                             )
 
                     except Exception as e:
-                        logger.error(f"❌ Erro ao remover sala {channel_name}: {str(e)}")
+                        logger.error(f"? Erro ao remover sala {channel_name}: {str(e)}")
                         continue
 
-            logger.info(f"✅ Limpeza concluída! {removed_count} salas removidas")
+            logger.info(f"? Limpeza conclu�da! {removed_count} salas removidas")
             return removed_count
 
         except Exception as e:
-            logger.error(f"❌ Erro na limpeza geral: {str(e)}")
+            logger.error(f"? Erro na limpeza geral: {str(e)}")
             return removed_count
+

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
@@ -14,6 +15,8 @@ from discord.ext import commands
 
 if TYPE_CHECKING:
     from discord import VoiceChannel
+
+from config import DB_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +53,7 @@ class TempRoomSlashCommands(commands.Cog):
             from pathlib import Path
             import aiosqlite
             
-            db_path = Path("database/discord_bot.db")
+            db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
@@ -366,3 +369,4 @@ async def setup(bot: commands.Bot) -> None:
     💡 Type hint completo para melhor documentação
     """
     await bot.add_cog(TempRoomSlashCommands(bot))
+

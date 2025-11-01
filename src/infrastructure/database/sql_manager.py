@@ -17,6 +17,9 @@ from typing import Any, ClassVar
 
 import aiosqlite
 
+# 💡 Caminho do banco de dados centralizado
+DB_PATH = Path(__file__).parent / "discord_bot.db"
+
 # 💡 Configuração de logging mais detalhada
 logger = logging.getLogger(__name__)
 
