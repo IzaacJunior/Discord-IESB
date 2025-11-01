@@ -182,21 +182,6 @@ class CleanArchitectureManager:
             logger.info("✨ Bot pronto para uso!")
 
         @self.bot.event
-        async def on_voice_state_update(
-            member: discord.Member,
-            before: discord.VoiceState,
-            after: discord.VoiceState,
-        ) -> None:
-            """
-            🔊 Monitora mudanças de estado de voz
-
-            💡 Boa Prática: Manager apenas delega para o controller
-            """
-            await self.channel_controller.handle_voice_state_update(
-                member, before, after
-            )
-
-        @self.bot.event
         async def on_message(message: discord.Message) -> None:
             """
             📝 Processa mensagens do chat

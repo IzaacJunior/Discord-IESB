@@ -172,7 +172,21 @@ async def start() -> None:
 
         # 🚀 Inicia bot
         logger.info("🚀 Iniciando bot com Clean Architecture...")
-        await bot.start(token)
+        try:
+            await bot.start(token)
+        finally:
+            # 🧹 Limpeza de salas temporárias antes de fechar
+            logger.info("🧹 Limpando salas temporárias antes de encerrar...")
+            try:
+                from manager import create_manager
+                manager = create_manager(bot)
+                
+                for guild in bot.guilds:
+                    removed = await manager.channel_controller.cleanup_all_temp_channels(guild)
+                    if removed > 0:
+                        logger.info(f"🧹 {removed} salas removidas do servidor {guild.name}")
+            except Exception as e:
+                logger.error(f"❌ Erro ao limpar salas: {str(e)}")
 
 
 def main() -> None:
