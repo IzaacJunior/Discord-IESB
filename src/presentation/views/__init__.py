@@ -1,7 +1,20 @@
 """
-Views - Componentes de UI (Modals, Select Menus, etc.)
-Boa Prática: Componentes reutilizáveis de interface!
+🎨 Presentation Views - UI Components
+💡 Views, Modals e componentes interativos do Discord
 """
 
-# Placeholder para futuras views
-# Exemplo: ChannelConfigModal, MemberSelectView, etc.
+from .temp_room_control_view import (
+    AddUserModal,
+    ChangeNameModal,
+    ChangeLimitModal,
+    TempRoomControlView,
+    create_temp_room_embed,
+)
+
+__all__ = [
+    "AddUserModal",
+    "ChangeNameModal",
+    "ChangeLimitModal",
+    "TempRoomControlView",
+    "create_temp_room_embed",
+]

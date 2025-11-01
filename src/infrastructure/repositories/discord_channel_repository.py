@@ -108,6 +108,97 @@ class DiscordChannelRepository(ChannelRepository):
             bitrate=discord_channel.bitrate,
         )
 
+    async def create_private_forum_channel(
+        self,
+        name: str,
+        guild_id: int,
+        member_id: int,
+        category_id: int | None = None,
+    ) -> discord.ForumChannel:
+        """
+        🏠 Cria um canal de fórum privado para um membro específico
+        
+        💡 Boa Prática: Canal totalmente privado com permissões granulares!
+        🔒 Segurança: Apenas o membro tem acesso total ao fórum
+        
+        Args:
+            name: Nome do canal de fórum
+            guild_id: ID do servidor
+            member_id: ID do membro que terá acesso exclusivo
+            category_id: ID da categoria (opcional)
+            
+        Returns:
+            discord.ForumChannel: Canal de fórum criado
+            
+        Raises:
+            ValueError: Se guild ou member não forem encontrados
+        """
+        logger.info("🏠 Criando fórum privado: %s para membro ID %s", name, member_id)
+
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            error_msg = f"Guild não encontrada: {guild_id}"
+            raise ValueError(error_msg)
+
+        member = guild.get_member(member_id)
+        if not member:
+            error_msg = f"Membro não encontrado: {member_id}"
+            raise ValueError(error_msg)
+
+        category = None
+        if category_id:
+            category = guild.get_channel(category_id)
+            if not isinstance(category, discord.CategoryChannel):
+                category = None
+
+        # 🔒 Configuração de permissões privadas
+        overwrites = {
+            # ❌ @everyone não pode ver nada
+            guild.default_role: discord.PermissionOverwrite(
+                view_channel=False,
+                read_messages=False,
+                send_messages=False,
+                create_public_threads=False,
+                create_private_threads=False,
+            ),
+            # ✅ Membro tem controle total do seu fórum
+            member: discord.PermissionOverwrite(
+                view_channel=True,
+                read_messages=True,
+                send_messages=True,
+                manage_messages=True,  # 🗑️ Pode deletar mensagens
+                manage_channels=True,   # ✏️ Pode editar nome e configurações
+                create_public_threads=False,   # ❌ NÃO pode criar threads públicas
+                create_private_threads=True,  # 🔒 Pode criar threads privadas
+                manage_threads=True,    # 🎛️ Pode gerenciar threads
+                embed_links=True,
+                attach_files=True,
+                add_reactions=True,
+                use_external_emojis=True,
+                read_message_history=True,
+            ),
+        }
+
+        # 🏗️ Cria o canal de fórum no Discord
+        forum_channel = await guild.create_forum(
+            name=name,
+            category=category,
+            overwrites=overwrites,
+            topic=f"🏠 Fórum privado de {member.display_name}",
+            default_auto_archive_duration=10080,  # 7 dias
+            default_sort_order=discord.ForumOrderType.latest_activity,
+            default_layout=discord.ForumLayoutType.list_view,
+        )
+
+        logger.info(
+            "✅ Fórum privado criado | nome=%s | member=%s | id=%s",
+            name,
+            member.display_name,
+            forum_channel.id
+        )
+
+        return forum_channel
+
     async def get_channel_by_id(self, channel_id: int) -> Channel | None:
         """
         🔍 Busca canal por ID
@@ -435,6 +526,64 @@ class DiscordChannelRepository(ChannelRepository):
         except Exception as e:
             logger.error("❌ Erro ao desmarcar categoria: %s", str(e))
             return False
+
+    async def get_temp_channels_by_category(
+        self,
+        category_id: int,
+        guild_id: int,
+    ) -> list[int]:
+        """
+        🔍 Busca todos os canais temporários de uma categoria
+        
+        💡 Boa Prática: Retorna lista de IDs para processamento em batch
+        
+        Args:
+            category_id: ID da categoria Discord
+            guild_id: ID do servidor Discord
+            
+        Returns:
+            list[int]: Lista com IDs dos canais temporários ativos
+        """
+        import aiosqlite
+        from pathlib import Path
+        
+        try:
+            logger.info(
+                "🔍 Buscando canais temporários da categoria ID %s", 
+                category_id
+            )
+            
+            # 🔍 Consulta banco de dados
+            db_path = Path("database/discord_bot.db")
+            async with aiosqlite.connect(db_path) as db:
+                cursor = await db.execute(
+                    """
+                    SELECT channel_id 
+                    FROM temporary_channels 
+                    WHERE category_id = ? AND guild_id = ? AND is_active = 1
+                    ORDER BY created_at
+                    """,
+                    (category_id, guild_id)
+                )
+                rows = await cursor.fetchall()
+                
+                # 📋 Extrai IDs dos canais
+                channel_ids = [row[0] for row in rows]
+                
+                logger.info(
+                    "✅ Encontrados %d canais temporários na categoria %s",
+                    len(channel_ids),
+                    category_id
+                )
+                
+                return channel_ids
+            
+        except Exception as e:
+            logger.error(
+                "❌ Erro ao buscar canais temporários: %s", 
+                str(e)
+            )
+            return []
 
     async def is_temporary_channel(
         self,

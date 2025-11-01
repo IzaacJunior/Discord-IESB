@@ -9,13 +9,15 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+import discord
+
 if TYPE_CHECKING:
-    import discord
     from infrastructure.repositories import DiscordChannelRepository
 
 from application.dtos import CreateChannelDTO
 from application.use_cases import CreateChannelUseCase
 from domain.entities import ChannelType
+from presentation.views import TempRoomControlView, create_temp_room_embed
 
 logger = logging.getLogger(__name__)
 
@@ -161,30 +163,90 @@ class ChannelController:
         member: discord.Member, 
         category_id: int | None = None
     ) -> bool:
-        """Cria canal de texto automático para novo membro."""
-        try:
-            logger.info("📝 Criando canal de texto para %s", member.display_name)
-
-            create_dto = CreateChannelDTO(
-                name=f"chat-{member.display_name.lower()}",
-                channel_type=ChannelType.TEXT,
-                guild_id=member.guild.id,
-                category_id=category_id,
-                member_id=member.id,
-                is_temporary=False
-            )
-
-            result = await self.create_channel_use_case.execute(create_dto)
+        """
+        🏠 Cria fórum privado para novo membro
+        
+        💡 Boa Prática: Fórum totalmente privado onde membro tem controle total!
+        🔒 Permissões: Apenas o membro pode ver, editar e gerenciar
+        
+        Funcionalidades:
+        - ✅ Canal visível apenas para o membro
+        - ✅ Pode modificar nome do canal
+        - ✅ Pode gerenciar mensagens (deletar, editar)
+        - ✅ Pode criar threads privadas (posts privados)
+        - ❌ NÃO pode criar threads públicas
+        - ✅ Threads criadas herdam as mesmas permissões do fórum
+        
+        Args:
+            member: Membro que receberá o fórum privado
+            category_id: ID da categoria (opcional)
             
-            if result.success:
-                logger.info("✅ Canal de texto criado para %s", member.display_name)
-            else:
-                logger.error("❌ Falha ao criar canal: %s", result.error_message)
+        Returns:
+            bool: True se fórum foi criado com sucesso
+        """
+        try:
+            logger.info("🏠 Criando fórum privado para %s", member.display_name)
+
+            # 🏗️ Gera nome do fórum baseado no membro
+            forum_name = f"🏠-{member.display_name.lower()}"
+            
+            # 🎯 Chama repository para criar fórum com permissões especiais
+            forum_channel = await self.channel_repository.create_private_forum_channel(
+                name=forum_name,
+                guild_id=member.guild.id,
+                member_id=member.id,
+                category_id=category_id,
+            )
+            
+            # 💬 Envia mensagem de boas-vindas no fórum
+            try:
+                # Cria thread inicial com instruções
+                welcome_thread = await forum_channel.create_thread(
+                    name="👋 Bem-vindo ao seu fórum!",
+                    content=(
+                        f"## 🎉 Olá, {member.mention}!\n\n"
+                        f"Este é o seu **fórum privado pessoal**! 🏠\n\n"
+                        f"### ✨ O que você pode fazer aqui:\n"
+                        f"- � **Criar threads privadas**: Clique em 'Nova Postagem' para criar tópicos privados\n"
+                        f"- ✏️ **Editar o nome**: Clique com botão direito no canal → 'Editar Canal'\n"
+                        f"- 🗑️ **Gerenciar mensagens**: Delete ou edite qualquer mensagem\n"
+                        f"- � **Privacidade total**: Apenas você pode ver este canal e seus posts!\n"
+                        f"- 🎨 **Personalizar**: Mude o nome, descrição, tags e tudo mais!\n\n"
+                        f"### 💡 Dicas:\n"
+                        f"- Use tags para organizar seus tópicos\n"
+                        f"- Threads são arquivadas automaticamente após 7 dias de inatividade\n"
+                        f"- Você tem controle total sobre este espaço! 💪\n"
+                        f"- ⚠️ **Importante**: Você só pode criar posts PRIVADOS (não públicos)\n\n"
+                        f"**Divirta-se organizando suas ideias!** ✨"
+                    ),
+                )
                 
-            return result.success
+                logger.info(
+                    "✅ Thread de boas-vindas criada | thread=%s",
+                    welcome_thread.thread.name
+                )
+                
+            except Exception as thread_error:
+                logger.warning(
+                    "⚠️ Não foi possível criar thread de boas-vindas: %s",
+                    str(thread_error)
+                )
+            
+            logger.info(
+                "✅ Fórum privado criado | member=%s | forum=%s | id=%s",
+                member.display_name,
+                forum_channel.name,
+                forum_channel.id
+            )
+            
+            return True
             
         except Exception as e:
-            logger.error("❌ Erro ao criar canal para membro: %s", str(e))
+            logger.exception(
+                "❌ Erro ao criar fórum para membro %s: %s",
+                member.display_name,
+                str(e)
+            )
             return False
 
     # ═══════════════════════════════════════════════════════════════
@@ -322,7 +384,7 @@ class ChannelController:
             if result.id > 0:
                 # Move usuário para nova sala
                 new_channel = member.guild.get_channel(result.id)
-                if new_channel:
+                if new_channel and isinstance(new_channel, discord.VoiceChannel):
                     await member.move_to(new_channel)
                     logger.info(
                         "✅ %s movido para sala '%s' (ID: %s)",
@@ -330,6 +392,38 @@ class ChannelController:
                         new_channel.name,
                         new_channel.id
                     )
+                    
+                    # 🎨 Envia embed com controles da sala DIRETAMENTE NO CANAL DE VOZ
+                    try:
+                        # Cria embed informativa
+                        embed = create_temp_room_embed(new_channel, member)
+                        
+                        # Cria view com botões de controle
+                        view = TempRoomControlView(
+                            voice_channel=new_channel,
+                            owner_id=member.id,
+                            timeout=None  # View nunca expira
+                        )
+                        
+                        # 💡 Envia diretamente no canal de voz (como mensagem inicial)
+                        await new_channel.send(
+                            content=f"🎉 {member.mention} Bem-vindo à sua sala temporária!",
+                            embed=embed,
+                            view=view
+                        )
+                        
+                        logger.info(
+                            "🎨 Embed de controle enviada | canal_voz=%s",
+                            new_channel.name
+                        )
+                    
+                    except Exception as embed_error:
+                        logger.error(
+                            "❌ Erro ao enviar embed de controle: %s",
+                            str(embed_error)
+                        )
+                        # Não falha a criação da sala se embed der erro
+                    
                     return True
                 else:
                     logger.error("❌ Canal ID %s não encontrado", result.id)
@@ -493,17 +587,87 @@ class ChannelController:
         category_id: int,
         guild_id: int
     ) -> bool:
-        """Remove marcação de categoria como geradora de salas temporárias."""
+        """
+        🗑️ Remove marcação de categoria e deleta todas salas temporárias
+        
+        💡 Boa Prática: Operação atômica - desmarcar + limpar canais
+        💡 Python 3.13: Pattern matching para status de limpeza
+        
+        Returns:
+            bool: True se categoria foi desmarcada (independente de haver canais)
+        """
         try:
             logger.info("🗑️ Removendo marcação de categoria ID %s", category_id)
 
+            # 🔍 Primeiro busca todos os canais temporários dessa categoria
+            channel_ids = await self.channel_repository.get_temp_channels_by_category(
+                category_id=category_id,
+                guild_id=guild_id
+            )
+
+            # 🧹 Deleta todos os canais temporários encontrados
+            deleted_count = 0
+            if channel_ids:
+                logger.info(
+                    "🧹 Deletando %d canais temporários da categoria %s",
+                    len(channel_ids),
+                    category_id
+                )
+                
+                for channel_id in channel_ids:
+                    try:
+                        # 🗑️ Deleta canal do Discord
+                        success = await self.channel_repository.delete_channel(
+                            channel_id=channel_id
+                        )
+                        
+                        if success:
+                            deleted_count += 1
+                            logger.debug("✅ Canal %s deletado", channel_id)
+                        else:
+                            logger.warning(
+                                "⚠️ Canal %s não encontrado no Discord", 
+                                channel_id
+                            )
+                            
+                    except Exception as channel_error:
+                        logger.error(
+                            "❌ Erro ao deletar canal %s: %s",
+                            channel_id,
+                            str(channel_error)
+                        )
+                
+                # 💬 Log do resultado da limpeza com pattern matching
+                match deleted_count:
+                    case 0:
+                        logger.warning("⚠️ Nenhum canal foi deletado")
+                    case count if count == len(channel_ids):
+                        logger.info(
+                            "✅ Todos os %d canais deletados com sucesso!", 
+                            count
+                        )
+                    case count:
+                        logger.warning(
+                            "⚠️ Apenas %d de %d canais foram deletados",
+                            count,
+                            len(channel_ids)
+                        )
+            else:
+                logger.info("💡 Nenhum canal temporário encontrado na categoria")
+
+            # 🗑️ Remove marcação da categoria (independente dos canais)
             success = await self.channel_repository.unmark_category_as_temp_generator(
                 category_id=category_id,
                 guild_id=guild_id
             )
 
             if success:
-                logger.info("✅ Categoria ID %s desmarcada", category_id)
+                logger.info(
+                    "✅ Categoria ID %s desmarcada | Canais deletados: %d/%d",
+                    category_id,
+                    deleted_count,
+                    len(channel_ids)
+                )
             else:
                 logger.warning("⚠️ Categoria ID %s não estava marcada", category_id)
 

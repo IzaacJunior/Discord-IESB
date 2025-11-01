@@ -31,11 +31,15 @@ class ADM(commands.Cog):
         self.channel_controller = ChannelController(channel_repository)
 
     # 🛠️ Métodos auxiliares privados - DRY Principle!
-    async def _validate_voice_state(self, ctx: commands.Context) -> CategoryChannel | None:
+    async def _validate_voice_state(
+        self, 
+        ctx: commands.Context
+    ) -> "CategoryChannel | None":
         """
         🔍 Valida se o usuário está em um canal de voz válido com categoria.
         
         💡 Python 3.13: Pattern matching para validações mais limpas
+        💡 String literal no type hint quando tipo está em TYPE_CHECKING
         
         Returns:
             CategoryChannel se válido, None caso contrário
@@ -192,21 +196,23 @@ class ADM(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def remove_category(self, ctx: commands.Context) -> None:
         """
-        🗑️ Remove marcação de categoria como geradora de salas temporárias.
+        🗑️ Remove marcação de categoria e deleta todas salas temporárias.
         
         💡 Python 3.13: Reutiliza validação e usa pattern matching
+        💡 Boa Prática: Operação completa - desmarcar + limpar canais
         
         Funcionamento:
         1. Admin usa comando em canal de voz
         2. Categoria do canal deixa de gerar salas temporárias
-        3. Sistema remove configuração do banco
+        3. TODOS os canais temporários da categoria são deletados
+        4. Sistema remove configuração do banco
         """
         # 🔍 Validação com método auxiliar reutilizável
         if not (category := await self._validate_voice_state(ctx)):
             return
         
         try:
-            # 🗑️ Delega para o controller remover categoria
+            # 🗑️ Delega para o controller remover categoria e canais
             success = await self.channel_controller.handle_unmark_category_as_temp_generator(
                 category_id=category.id,
                 guild_id=ctx.guild.id
@@ -216,11 +222,12 @@ class ADM(commands.Cog):
             match success:
                 case True:
                     await ctx.send(
-                        f"✅ Categoria **{category.name}** não gera mais salas temporárias!",
-                        delete_after=5
+                        f"✅ Categoria **{category.name}** não gera mais salas temporárias!\n"
+                        f"🧹 Todas as salas temporárias dessa categoria foram deletadas!",
+                        delete_after=10
                     )
                     logger.info(
-                        "✅ Categoria removida | categoria=%s | guild=%s | admin=%s",
+                        "✅ Categoria removida e limpa | categoria=%s | guild=%s | admin=%s",
                         category.name,
                         ctx.guild.name,
                         ctx.author.name
