@@ -628,3 +628,482 @@ class DiscordChannelRepository(ChannelRepository):
         except Exception as e:
             logger.error("❌ Erro ao verificar canal temporário: %s", str(e))
             return False
+
+    # ═══════════════════════════════════════════════════════════════
+    # 🏠 GERENCIAMENTO DE FÓRUNS ÚNICOS POR MEMBRO
+    # ═══════════════════════════════════════════════════════════════
+
+    async def is_unique_channel_category(
+        self,
+        category_id: int,
+        guild_id: int,
+    ) -> bool:
+        """
+        🔍 Verifica se categoria está marcada para criar fóruns únicos.
+        
+        💡 Boa Prática: Consulta banco de dados para verificar configuração
+        
+        Args:
+            category_id: ID da categoria Discord
+            guild_id: ID do servidor Discord
+            
+        Returns:
+            bool: True se categoria cria fóruns únicos
+        """
+        import aiosqlite
+        from pathlib import Path
+        
+        try:
+            logger.debug(
+                "🔍 Verificando se categoria %s gera fóruns únicos", 
+                category_id
+            )
+            
+            db_path = Path("database/discord_bot.db")
+            async with aiosqlite.connect(db_path) as db:
+                cursor = await db.execute(
+                    """
+                    SELECT category_name FROM unique_channel_categories
+                    WHERE category_id = ? AND guild_id = ?
+                    """,
+                    (category_id, guild_id)
+                )
+                row = await cursor.fetchone()
+                
+                if row:
+                    logger.debug(
+                        "✅ Categoria '%s' gera fóruns únicos", 
+                        row[0]
+                    )
+                    return True
+                else:
+                    logger.debug(
+                        "❌ Categoria %s não gera fóruns únicos", 
+                        category_id
+                    )
+                    return False
+                
+        except Exception as e:
+            logger.error(
+                "❌ Erro ao verificar categoria única: %s", 
+                str(e)
+            )
+            return False
+
+    async def get_unique_channel_category(
+        self,
+        guild_id: int,
+    ) -> dict | None:
+        """
+        🔍 Busca a categoria configurada para fóruns únicos no servidor.
+        
+        💡 Boa Prática: Apenas UMA categoria por guilda
+        
+        Args:
+            guild_id: ID do servidor Discord
+            
+        Returns:
+            dict | None: Informações da categoria ou None se não configurada
+                {
+                    "category_id": int,
+                    "category_name": str,
+                    "created_at": str
+                }
+        """
+        import aiosqlite
+        from pathlib import Path
+        
+        try:
+            logger.debug(
+                "🔍 Buscando categoria configurada para guilda %s",
+                guild_id
+            )
+            
+            db_path = Path("database/discord_bot.db")
+            async with aiosqlite.connect(db_path) as db:
+                cursor = await db.execute(
+                    """
+                    SELECT category_id, category_name, created_at
+                    FROM unique_channel_categories
+                    WHERE guild_id = ?
+                    LIMIT 1
+                    """,
+                    (guild_id,)
+                )
+                row = await cursor.fetchone()
+                
+                if row:
+                    category_data = {
+                        "category_id": row[0],
+                        "category_name": row[1],
+                        "created_at": row[2]
+                    }
+                    logger.debug(
+                        "✅ Categoria configurada encontrada: '%s' (ID: %s)",
+                        category_data["category_name"],
+                        category_data["category_id"]
+                    )
+                    return category_data
+                else:
+                    logger.debug(
+                        "❌ Nenhuma categoria configurada para guilda %s",
+                        guild_id
+                    )
+                    return None
+                
+        except Exception as e:
+            logger.error(
+                "❌ Erro ao buscar categoria configurada: %s",
+                str(e)
+            )
+            return None
+
+    async def mark_category_as_unique_generator(
+        self,
+        category_id: int,
+        category_name: str,
+        guild_id: int,
+    ) -> bool:
+        """
+        💾 Marca categoria como geradora de fóruns únicos por membro.
+        
+        💡 Boa Prática: Apenas UMA categoria por guilda
+        🔒 Remove categoria antiga se já existir e adiciona nova
+        
+        Args:
+            category_id: ID da categoria Discord
+            category_name: Nome da categoria
+            guild_id: ID do servidor Discord
+            
+        Returns:
+            bool: True se marcação foi bem-sucedida
+        """
+        import aiosqlite
+        from pathlib import Path
+        
+        try:
+            logger.info(
+                "💾 Marcando categoria '%s' como geradora de fóruns únicos",
+                category_name
+            )
+            
+            db_path = Path("database/discord_bot.db")
+            async with aiosqlite.connect(db_path) as db:
+                # 🔍 STEP 1: Verifica se já existe categoria configurada nesta guilda
+                cursor = await db.execute(
+                    """
+                    SELECT category_id, category_name 
+                    FROM unique_channel_categories
+                    WHERE guild_id = ?
+                    """,
+                    (guild_id,)
+                )
+                existing = await cursor.fetchone()
+                
+                # 🗑️ STEP 2: Se já existe, remove a antiga
+                if existing:
+                    old_category_id, old_category_name = existing
+                    
+                    logger.info(
+                        "🔄 Substituindo categoria antiga '%s' (ID: %s) por '%s' (ID: %s)",
+                        old_category_name,
+                        old_category_id,
+                        category_name,
+                        category_id
+                    )
+                    
+                    await db.execute(
+                        """
+                        DELETE FROM unique_channel_categories
+                        WHERE guild_id = ?
+                        """,
+                        (guild_id,)
+                    )
+                
+                # ✅ STEP 3: Insere nova categoria
+                await db.execute(
+                    """
+                    INSERT INTO unique_channel_categories 
+                    (category_id, category_name, guild_id)
+                    VALUES (?, ?, ?)
+                    """,
+                    (category_id, category_name, guild_id)
+                )
+                await db.commit()
+                
+                logger.info(
+                    "✅ Categoria '%s' marcada com sucesso (única para esta guilda)",
+                    category_name
+                )
+                return True
+                
+        except Exception as e:
+            logger.error(
+                "❌ Erro ao marcar categoria: %s", 
+                str(e)
+            )
+            return False
+
+    async def unmark_category_as_unique_generator(
+        self,
+        category_id: int,
+        guild_id: int,
+    ) -> bool:
+        """
+        🗑️ Remove marcação de categoria como geradora de fóruns únicos.
+        
+        💡 Boa Prática: Remove apenas configuração, mantém registros de canais
+        
+        Args:
+            category_id: ID da categoria Discord
+            guild_id: ID do servidor Discord
+            
+        Returns:
+            bool: True se remoção foi bem-sucedida
+        """
+        import aiosqlite
+        from pathlib import Path
+        
+        try:
+            logger.info(
+                "🗑️ Removendo marcação da categoria ID %s",
+                category_id
+            )
+            
+            db_path = Path("database/discord_bot.db")
+            async with aiosqlite.connect(db_path) as db:
+                cursor = await db.execute(
+                    """
+                    DELETE FROM unique_channel_categories
+                    WHERE category_id = ? AND guild_id = ?
+                    """,
+                    (category_id, guild_id)
+                )
+                await db.commit()
+                
+                if cursor.rowcount > 0:
+                    logger.info(
+                        "✅ Categoria ID %s desmarcada com sucesso",
+                        category_id
+                    )
+                    return True
+                else:
+                    logger.warning(
+                        "⚠️ Categoria ID %s não estava marcada",
+                        category_id
+                    )
+                    return False
+                
+        except Exception as e:
+            logger.error(
+                "❌ Erro ao desmarcar categoria: %s", 
+                str(e)
+            )
+            return False
+
+    async def member_has_unique_channel_in_category(
+        self,
+        member_id: int,
+        category_id: int,
+        guild_id: int,
+    ) -> bool:
+        """
+        🔍 Verifica se membro JÁ possui fórum único nesta categoria.
+        
+        💡 Boa Prática: Evita criar canais duplicados para o mesmo membro
+        
+        Args:
+            member_id: ID do membro Discord
+            category_id: ID da categoria Discord
+            guild_id: ID do servidor Discord
+            
+        Returns:
+            bool: True se membro já tem canal nesta categoria
+        """
+        import aiosqlite
+        from pathlib import Path
+        
+        try:
+            logger.debug(
+                "🔍 Verificando se membro %s tem canal na categoria %s",
+                member_id,
+                category_id
+            )
+            
+            db_path = Path("database/discord_bot.db")
+            async with aiosqlite.connect(db_path) as db:
+                cursor = await db.execute(
+                    """
+                    SELECT channel_id, channel_name 
+                    FROM member_unique_channels
+                    WHERE member_id = ? 
+                    AND category_id = ? 
+                    AND guild_id = ?
+                    AND is_active = 1
+                    """,
+                    (member_id, category_id, guild_id)
+                )
+                row = await cursor.fetchone()
+                
+                if row:
+                    logger.debug(
+                        "✅ Membro %s já tem canal '%s' (ID: %s)",
+                        member_id,
+                        row[1],
+                        row[0]
+                    )
+                    return True
+                else:
+                    logger.debug(
+                        "❌ Membro %s não tem canal na categoria %s",
+                        member_id,
+                        category_id
+                    )
+                    return False
+                
+        except Exception as e:
+            logger.error(
+                "❌ Erro ao verificar canal do membro: %s", 
+                str(e)
+            )
+            return False
+
+    async def register_member_unique_channel(
+        self,
+        member_id: int,
+        channel_id: int,
+        channel_name: str,
+        guild_id: int,
+        category_id: int,
+    ) -> bool:
+        """
+        💾 Registra fórum único criado para um membro.
+        
+        💡 Boa Prática: Relaciona membro com canal para controle
+        🔒 UNIQUE constraint evita duplicatas
+        
+        Args:
+            member_id: ID do membro Discord
+            channel_id: ID do canal criado
+            channel_name: Nome do canal
+            guild_id: ID do servidor Discord
+            category_id: ID da categoria onde o canal está
+            
+        Returns:
+            bool: True se registro foi bem-sucedido
+        """
+        import aiosqlite
+        from pathlib import Path
+        
+        try:
+            logger.info(
+                "💾 Registrando canal único '%s' para membro %s",
+                channel_name,
+                member_id
+            )
+            
+            db_path = Path("database/discord_bot.db")
+            async with aiosqlite.connect(db_path) as db:
+                try:
+                    await db.execute(
+                        """
+                        INSERT INTO member_unique_channels
+                        (member_id, channel_id, channel_name, guild_id, category_id, is_active)
+                        VALUES (?, ?, ?, ?, ?, 1)
+                        """,
+                        (member_id, channel_id, channel_name, guild_id, category_id)
+                    )
+                    await db.commit()
+                    
+                    logger.info(
+                        "✅ Canal '%s' registrado para membro %s",
+                        channel_name,
+                        member_id
+                    )
+                    return True
+                    
+                except aiosqlite.IntegrityError:
+                    # Membro já tem canal nesta categoria
+                    logger.warning(
+                        "⚠️ Membro %s já tem canal na categoria %s",
+                        member_id,
+                        category_id
+                    )
+                    return False
+                
+        except Exception as e:
+            logger.error(
+                "❌ Erro ao registrar canal único: %s", 
+                str(e)
+            )
+            return False
+
+    async def get_member_unique_channels(
+        self,
+        member_id: int,
+        guild_id: int,
+    ) -> list[dict]:
+        """
+        📋 Lista todos os fóruns únicos de um membro no servidor.
+        
+        💡 Útil para debug e listagem de canais do membro
+        
+        Args:
+            member_id: ID do membro Discord
+            guild_id: ID do servidor Discord
+            
+        Returns:
+            list[dict]: Lista com informações dos canais
+        """
+        import aiosqlite
+        from pathlib import Path
+        
+        try:
+            logger.debug(
+                "📋 Buscando canais únicos do membro %s",
+                member_id
+            )
+            
+            db_path = Path("database/discord_bot.db")
+            async with aiosqlite.connect(db_path) as db:
+                cursor = await db.execute(
+                    """
+                    SELECT 
+                        channel_id,
+                        channel_name,
+                        category_id,
+                        created_at,
+                        is_active
+                    FROM member_unique_channels
+                    WHERE member_id = ? AND guild_id = ?
+                    ORDER BY created_at DESC
+                    """,
+                    (member_id, guild_id)
+                )
+                rows = await cursor.fetchall()
+                
+                channels = [
+                    {
+                        "channel_id": row[0],
+                        "channel_name": row[1],
+                        "category_id": row[2],
+                        "created_at": row[3],
+                        "is_active": bool(row[4]),
+                    }
+                    for row in rows
+                ]
+                
+                logger.debug(
+                    "✅ Encontrados %d canais para membro %s",
+                    len(channels),
+                    member_id
+                )
+                
+                return channels
+                
+        except Exception as e:
+            logger.error(
+                "❌ Erro ao buscar canais do membro: %s", 
+                str(e)
+            )
+            return []

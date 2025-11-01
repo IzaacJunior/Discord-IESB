@@ -253,6 +253,199 @@ class ADM(commands.Cog):
                 delete_after=5
             )
 
+    @commands.command(
+        name="+channel",
+        help="🏠 Marca categoria para criar fóruns privados únicos quando membro entrar"
+    )
+    @commands.has_permissions(administrator=True)
+    async def add_unique_channel_category(self, ctx: commands.Context) -> None:
+        """
+        🏠 Marca categoria como geradora de fóruns únicos por membro.
+        
+        💡 Boa Prática: Cada membro recebe UM ÚNICO fórum nesta categoria
+        🔒 Sistema inteligente: Verifica se categoria já existe antes de criar
+        ✨ NOVO: Cria salas para TODOS os membros existentes que não têm
+        
+        Funcionamento:
+        1. Admin usa comando em canal dentro de uma categoria
+        2. Categoria é marcada como "unique channel generator"
+        3. Sistema salva no banco de dados
+        4. 🎁 BÔNUS: Cria salas para membros que já estão no servidor (exceto bots)
+        5. Quando novos membros entrarem:
+           - Verifica se JÁ tem canal nesta categoria
+           - Se NÃO tem: cria fórum privado único
+           - Se JÁ tem: ignora criação (evita duplicatas)
+        """
+        # 🔍 Validação com método auxiliar reutilizável
+        if not (category := await self._validate_voice_state(ctx)):
+            return
+        
+        try:
+            # 🚀 Delega para o controller marcar categoria como unique channel generator
+            success = await self.channel_controller.handle_mark_category_as_unique_generator(
+                category=category,
+                guild_id=ctx.guild.id
+            )
+            
+            # 💬 Feedback baseado no resultado com match/case (Python 3.13)
+            match success:
+                case True:
+                    # 🎉 Mensagem inicial de confirmação
+                    initial_message = await ctx.send(
+                        f"✅ Categoria **{category.name}** marcada para fóruns únicos!\n"
+                        f"� Criando salas para membros existentes...",
+                    )
+                    
+                    logger.info(
+                        "✅ Categoria configurada para fóruns únicos | categoria=%s | guild=%s | admin=%s",
+                        category.name,
+                        ctx.guild.name,
+                        ctx.author.name
+                    )
+                    
+                    # 🏗️ Cria salas para membros existentes
+                    created_count = 0
+                    skipped_count = 0
+                    
+                    for member in ctx.guild.members:
+                        # 🤖 Ignora bots
+                        if member.bot:
+                            logger.debug("🤖 Ignorando bot: %s", member.name)
+                            continue
+                        
+                        # 🏠 Tenta criar sala única para o membro
+                        try:
+                            result = await self.channel_controller.handle_create_unique_member_channel(
+                                member=member,
+                                category_id=category.id
+                            )
+                            
+                            if result:
+                                created_count += 1
+                                logger.info(
+                                    "✅ Sala criada | member=%s | categoria=%s",
+                                    member.display_name,
+                                    category.name
+                                )
+                            else:
+                                skipped_count += 1
+                                logger.debug(
+                                    "⏭️ Sala já existe | member=%s",
+                                    member.display_name
+                                )
+                        
+                        except Exception as member_error:
+                            skipped_count += 1
+                            logger.error(
+                                "❌ Erro ao criar sala para %s: %s",
+                                member.display_name,
+                                str(member_error)
+                            )
+                    
+                    # 📊 Mensagem final com estatísticas
+                    await initial_message.edit(
+                        content=(
+                            f"✅ Categoria **{category.name}** configurada com sucesso!\n\n"
+                            f"📊 **Resultado da criação em massa:**\n"
+                            f"• 🏠 Salas criadas: **{created_count}**\n"
+                            f"• ⏭️ Membros já tinham sala: **{skipped_count}**\n"
+                            f"• 🤖 Bots ignorados: **{sum(1 for m in ctx.guild.members if m.bot)}**\n\n"
+                            f"💡 Novos membros receberão salas automaticamente ao entrar! 🎉"
+                        )
+                    )
+                    
+                    logger.info(
+                        "📊 Criação em massa concluída | criadas=%d | ignoradas=%d | categoria=%s",
+                        created_count,
+                        skipped_count,
+                        category.name
+                    )
+                    
+                case False:
+                    await ctx.send(
+                        f"⚠️ A categoria **{category.name}** já está configurada para fóruns únicos!",
+                        delete_after=5
+                    )
+                    logger.warning(
+                        "⚠️ Categoria já configurada | categoria=%s",
+                        category.name
+                    )
+                
+        except Exception as e:
+            logger.exception(
+                "❌ Erro ao configurar categoria | categoria=%s | erro=%s",
+                category.name,
+                type(e).__name__
+            )
+            await ctx.send(
+                f"❌ Erro ao configurar categoria: {e!s}",
+                delete_after=5
+            )
+
+    @commands.command(
+        name="-channel",
+        help="🗑️ Remove configuração de categoria de fóruns únicos"
+    )
+    @commands.has_permissions(administrator=True)
+    async def remove_unique_channel_category(self, ctx: commands.Context) -> None:
+        """
+        🗑️ Remove marcação de categoria e limpa relacionamentos.
+        
+        💡 Boa Prática: Operação completa - desmarcar + limpar registros
+        ⚠️ IMPORTANTE: NÃO deleta os canais, apenas remove configuração
+        
+        Funcionamento:
+        1. Admin usa comando em canal dentro da categoria
+        2. Categoria deixa de gerar fóruns únicos
+        3. Registros de canais existentes são mantidos
+        4. Sistema remove apenas a configuração do banco
+        """
+        # 🔍 Validação com método auxiliar reutilizável
+        if not (category := await self._validate_voice_state(ctx)):
+            return
+        
+        try:
+            # 🗑️ Delega para o controller remover categoria
+            success = await self.channel_controller.handle_unmark_category_as_unique_generator(
+                category_id=category.id,
+                guild_id=ctx.guild.id
+            )
+            
+            # 💬 Feedback baseado no resultado com match/case (Python 3.13)
+            match success:
+                case True:
+                    await ctx.send(
+                        f"✅ Categoria **{category.name}** não gera mais fóruns únicos!\n"
+                        f"💡 Canais existentes foram mantidos (não deletados)",
+                        delete_after=10
+                    )
+                    logger.info(
+                        "✅ Categoria removida de fóruns únicos | categoria=%s | guild=%s | admin=%s",
+                        category.name,
+                        ctx.guild.name,
+                        ctx.author.name
+                    )
+                case False:
+                    await ctx.send(
+                        f"⚠️ A categoria **{category.name}** não estava configurada!",
+                        delete_after=5
+                    )
+                    logger.warning(
+                        "⚠️ Categoria não estava configurada | categoria=%s",
+                        category.name
+                    )
+                
+        except Exception as e:
+            logger.exception(
+                "❌ Erro ao remover categoria | categoria=%s | erro=%s",
+                category.name,
+                type(e).__name__
+            )
+            await ctx.send(
+                f"❌ Erro ao remover categoria: {e!s}",
+                delete_after=5
+            )
+
 
 async def setup(bot: commands.Bot) -> None:
     """

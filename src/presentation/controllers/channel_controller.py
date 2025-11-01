@@ -678,6 +678,214 @@ class ChannelController:
             return False
 
     # ═══════════════════════════════════════════════════════════════
+    # 🏠 GERENCIAMENTO DE FÓRUNS ÚNICOS POR MEMBRO
+    # ═══════════════════════════════════════════════════════════════
+
+    async def handle_mark_category_as_unique_generator(
+        self,
+        category: discord.CategoryChannel,
+        guild_id: int
+    ) -> bool:
+        """
+        🏠 Marca categoria como geradora de fóruns únicos por membro.
+        
+        💡 Quando membro entra no servidor, cria UM fórum privado nesta categoria
+        🔒 Sistema inteligente evita duplicatas
+        
+        Returns:
+            bool: True se categoria foi marcada com sucesso
+        """
+        try:
+            logger.info(
+                "🏠 Marcando categoria '%s' para fóruns únicos",
+                category.name
+            )
+
+            # 💾 Marca categoria no banco de dados
+            success = await self.channel_repository.mark_category_as_unique_generator(
+                category_id=category.id,
+                category_name=category.name,
+                guild_id=guild_id
+            )
+
+            if success:
+                logger.info(
+                    "✅ Categoria '%s' marcada para fóruns únicos",
+                    category.name
+                )
+            else:
+                logger.warning(
+                    "⚠️ Categoria '%s' já estava marcada",
+                    category.name
+                )
+
+            return success
+
+        except Exception as e:
+            logger.exception(
+                "❌ Erro ao marcar categoria para fóruns únicos: %s",
+                str(e)
+            )
+            return False
+
+    async def handle_unmark_category_as_unique_generator(
+        self,
+        category_id: int,
+        guild_id: int
+    ) -> bool:
+        """
+        🗑️ Remove marcação de categoria como geradora de fóruns únicos.
+        
+        💡 Remove apenas configuração, mantém canais existentes
+        
+        Returns:
+            bool: True se categoria foi desmarcada
+        """
+        try:
+            logger.info(
+                "🗑️ Removendo marcação de categoria ID %s",
+                category_id
+            )
+
+            # 🗑️ Remove marcação do banco
+            success = await self.channel_repository.unmark_category_as_unique_generator(
+                category_id=category_id,
+                guild_id=guild_id
+            )
+
+            if success:
+                logger.info(
+                    "✅ Categoria ID %s desmarcada",
+                    category_id
+                )
+            else:
+                logger.warning(
+                    "⚠️ Categoria ID %s não estava marcada",
+                    category_id
+                )
+
+            return success
+
+        except Exception as e:
+            logger.error(
+                "❌ Erro ao desmarcar categoria: %s",
+                str(e)
+            )
+            return False
+
+    async def handle_create_unique_member_channel(
+        self,
+        member: discord.Member,
+        category_id: int
+    ) -> bool:
+        """
+        🏠 Cria fórum privado único para membro em categoria específica.
+        
+        💡 Boa Prática: Verifica duplicatas ANTES de criar
+        🔒 Sistema inteligente evita múltiplos canais na mesma categoria
+        
+        Fluxo:
+        1. Verifica se membro JÁ tem canal nesta categoria
+        2. Se JÁ tem: ignora criação (retorna True silenciosamente)
+        3. Se NÃO tem: cria fórum privado único
+        4. Registra relacionamento no banco de dados
+        
+        Args:
+            member: Membro que receberá o fórum
+            category_id: ID da categoria configurada
+            
+        Returns:
+            bool: True se canal foi criado ou já existe
+        """
+        try:
+            # 🔍 CHECK 1: Membro já tem canal nesta categoria?
+            already_has_channel = await self.channel_repository.member_has_unique_channel_in_category(
+                member_id=member.id,
+                category_id=category_id,
+                guild_id=member.guild.id
+            )
+
+            if already_has_channel:
+                logger.info(
+                    "⏭️ IGNORADO: Membro %s já tem canal único na categoria %s",
+                    member.display_name,
+                    category_id
+                )
+                return True  # Não é erro, apenas já existe
+
+            # 🏗️ Cria fórum privado único
+            logger.info(
+                "🏠 Criando fórum único para %s na categoria %s",
+                member.display_name,
+                category_id
+            )
+
+            forum_name = f"🏠-{member.display_name.lower()}"
+
+            # 🎯 Chama repository para criar fórum
+            forum_channel = await self.channel_repository.create_private_forum_channel(
+                name=forum_name,
+                guild_id=member.guild.id,
+                member_id=member.id,
+                category_id=category_id
+            )
+
+            # 💾 Registra no banco de dados
+            registered = await self.channel_repository.register_member_unique_channel(
+                member_id=member.id,
+                channel_id=forum_channel.id,
+                channel_name=forum_channel.name,
+                guild_id=member.guild.id,
+                category_id=category_id
+            )
+
+            if registered:
+                logger.info(
+                    "✅ Fórum único criado e registrado | member=%s | channel=%s | category=%s",
+                    member.display_name,
+                    forum_channel.name,
+                    category_id
+                )
+
+                # 💬 Envia mensagem de boas-vindas no fórum
+                try:
+                    welcome_thread = await forum_channel.create_thread(
+                        name="👋 Bem-vindo ao seu espaço único!",
+                        content=(
+                            f"## 🎉 Olá, {member.mention}!\n\n"
+                            f"Este é o seu **fórum privado único**! 🏠\n\n"
+                            f"### ✨ Características especiais:\n"
+                            f"- 🔒 **Totalmente privado**: Apenas você pode ver!\n"
+                            f"- ✏️ **Personalizável**: Edite nome, descrição e tudo mais\n"
+                            f"- 📝 **Organize suas ideias**: Crie posts privados\n"
+                            f"- 🗑️ **Controle total**: Gerencie todas as mensagens\n"
+                            f"- ♻️ **Único**: Este é seu ÚNICO fórum nesta categoria!\n\n"
+                            f"**Aproveite seu espaço pessoal!** ✨"
+                        ),
+                    )
+                    logger.debug("✅ Thread de boas-vindas criada")
+                except Exception as thread_error:
+                    logger.warning(
+                        "⚠️ Não foi possível criar thread de boas-vindas: %s",
+                        str(thread_error)
+                    )
+
+                return True
+            else:
+                logger.error(
+                    "❌ Fórum criado mas não foi registrado no banco",
+                )
+                return False
+
+        except Exception as e:
+            logger.exception(
+                "❌ Erro ao criar fórum único para %s: %s",
+                member.display_name,
+                str(e)
+            )
+            return False
+
+    # ═══════════════════════════════════════════════════════════════
     # 🧹 LIMPEZA E MANUTENÇÃO
     # ═══════════════════════════════════════════════════════════════
 

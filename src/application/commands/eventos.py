@@ -79,9 +79,13 @@ class Eventos(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
         """
-        👋 Cria fórum privado automático quando membro entra no servidor
+        👋 Cria fórum privado único quando membro entra no servidor
 
-        💡 Boa Prática: Cada membro recebe seu espaço privado personalizado
+        💡 Sistema Inteligente com Categorias:
+        1. Verifica se há categoria configurada para fóruns únicos
+        2. Se SIM: cria fórum único na categoria configurada
+        3. Se NÃO: ignora criação (sistema desativado)
+        
         🏠 Fluxo: Discord Event → Controller → Repository → Discord API
 
         Funcionalidades do fórum criado:
@@ -90,6 +94,7 @@ class Eventos(commands.Cog):
         - 🗑️ Membro pode gerenciar todas as mensagens
         - 📝 Membro pode criar threads (posts) no fórum
         - 🎨 Threads herdam as mesmas permissões privadas
+        - ♻️ ÚNICO por categoria (evita duplicatas)
 
         Args:
             member: Membro que acabou de entrar no servidor
@@ -103,26 +108,65 @@ class Eventos(commands.Cog):
             logger.debug("🤖 Membro é bot, ignorando criação de fórum")
             return
 
-        # 🎯 Delega para Controller criar fórum privado
-        success = await self.channel_controller.handle_create_member_text_channel(
-            member=member,
-            category_id=None,  # Pode ser configurado para categoria específica
-        )
-
-        # 💬 Log do resultado com pattern matching (Python 3.13)
-        match success:
-            case True:
+        # 🔍 STEP 1: Busca no banco se existe categoria configurada (apenas UMA por guilda)
+        try:
+            guild = member.guild
+            
+            # 💾 Consulta banco de dados para buscar categoria configurada
+            configured_category = await self.channel_controller.channel_repository.get_unique_channel_category(
+                guild_id=guild.id
+            )
+            
+            # 🎯 STEP 2: Se NÃO há categoria configurada, ignora criação
+            if not configured_category:
                 logger.info(
-                    "✅ Fórum privado criado | member=%s | guild=%s",
-                    member.display_name,
-                    member.guild.name
+                    "⏭️ Nenhuma categoria configurada para fóruns únicos | servidor=%s",
+                    guild.name
                 )
-            case False:
-                logger.error(
-                    "❌ Falha ao criar fórum | member=%s | guild=%s",
-                    member.display_name,
-                    member.guild.name
+                return
+            
+            # 🔍 Busca a categoria no Discord
+            category = guild.get_channel(configured_category["category_id"])
+            
+            if not category:
+                logger.warning(
+                    "⚠️ Categoria configurada não encontrada no Discord | category_id=%s | servidor=%s",
+                    configured_category["category_id"],
+                    guild.name
                 )
+                return
+            
+            # 🏠 STEP 3: Cria fórum único na categoria configurada
+            logger.info(
+                "🎯 Categoria configurada encontrada: '%s' | Criando fórum único",
+                configured_category["category_name"]
+            )
+            
+            success = await self.channel_controller.handle_create_unique_member_channel(
+                member=member,
+                category_id=category.id
+            )
+            
+            # 💬 Log do resultado
+            if success:
+                logger.info(
+                    "✅ Fórum único criado | member=%s | categoria=%s",
+                    member.display_name,
+                    category.name
+                )
+            else:
+                logger.info(
+                    "⏭️ Fórum não criado (pode já existir) | member=%s | categoria=%s",
+                    member.display_name,
+                    category.name
+                )
+                
+        except Exception as e:
+            logger.exception(
+                "❌ Erro ao processar entrada de membro %s: %s",
+                member.display_name,
+                str(e)
+            )
 
 
 async def setup(bot: commands.Bot) -> None:
