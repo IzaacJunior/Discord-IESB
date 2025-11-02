@@ -8,6 +8,7 @@ from pathlib import Path
 
 from config import DB_PATH
 from domain.entities import ChannelType, TextChannel, VoiceChannel
+from domain.events import DomainEvent
 from domain.repositories import ChannelRepository
 
 from ..dtos import ChannelResponseDTO, CreateChannelDTO
@@ -23,8 +24,16 @@ class CreateChannelUseCase:
     regras de negócio complexas com verificação de duplicatas!
     """
 
-    def __init__(self, channel_repository: ChannelRepository):
+    def __init__(self, channel_repository: ChannelRepository, event_bus=None):
+        """
+        Inicializa use case
+        
+        Args:
+            channel_repository: Repositório de canais
+            event_bus: Event Bus para publicar eventos (opcional para compatibilidade)
+        """
         self.channel_repository = channel_repository
+        self.event_bus = event_bus
 
     async def execute(self, request: CreateChannelDTO) -> ChannelResponseDTO:
         """
@@ -100,6 +109,10 @@ class CreateChannelUseCase:
                     category_id=request.category_id,
                     owner_id=getattr(request, 'member_id', None)
                 )
+            
+            # 📢 Publica evento de criação (se Event Bus estiver configurado)
+            if self.event_bus and request.channel_type == ChannelType.VOICE:
+                await self._publish_channel_created_event(channel, request)
 
             return ChannelResponseDTO(
                 id=channel.id,
@@ -170,6 +183,45 @@ class CreateChannelUseCase:
         except Exception as e:
             logger.error("❌ Erro ao salvar canal temporário no banco: %s", str(e))
             return False
+    
+    async def _publish_channel_created_event(
+        self,
+        channel: VoiceChannel | TextChannel,
+        request: CreateChannelDTO
+    ) -> None:
+        """
+        📢 Publica evento de canal criado
+        
+        💡 Boa Prática: Event Bus desacopla notificações,
+        analytics e outras reações da lógica principal!
+        
+        Args:
+            channel: Canal criado
+            request: Request original
+        """
+        try:
+            is_temporary = getattr(request, 'is_temporary', False)
+            owner_id = getattr(request, 'member_id', None)
+            
+            event = DomainEvent(
+                event_type="temp_room_created" if is_temporary else "channel_created",
+                data={
+                    "channel_id": channel.id,
+                    "channel_name": channel.name,
+                    "channel_type": request.channel_type.value,
+                    "guild_id": request.guild_id,
+                    "category_id": request.category_id,
+                    "owner_id": owner_id,
+                    "is_temporary": is_temporary,
+                }
+            )
+            
+            await self.event_bus.publish(event)
+            logger.debug("📢 Evento publicado: %s", event.event_type)
+            
+        except Exception as e:
+            # 🛡️ Não quebra criação do canal se evento falhar
+            logger.error("❌ Erro ao publicar evento de canal criado: %s", str(e))
 
 
 class ManageTemporaryChannelsUseCase:
