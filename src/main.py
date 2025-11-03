@@ -7,13 +7,17 @@ import asyncio
 import logging
 from pathlib import Path
 
+import colorlog
 import discord
 from decouple import config
 from discord.ext import commands
 
-from infrastructure.repositories import DiscordChannelRepository
+from infrastructure.repositories import DiscordChannelRepository, SQLiteCategoryRepository
 from manager import CleanArchitectureManager
 from presentation.controllers import ChannelController
+
+# 📊 Inicializa sistema de auditoria (DEVE vir antes de pegar o logger!)
+from infrastructure.database.audit_logger import audit_logger  # noqa: F401
 
 intents = discord.Intents.default()
 intents.members = True
@@ -21,15 +25,14 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 logger = logging.getLogger(__name__)
+audit = logging.getLogger('audit') 
 
 
 # 🏗️ Dependency Injection Container
 class DIContainer:
     """
     🏗️ Container de Injeção de Dependência
-
-    💡 Boa Prática: Composition Root que configura
-    todas as dependências da aplicação!
+    💡 Boa Prática: Composition Root centralizado!
     """
 
     def __init__(self, bot: commands.Bot):
@@ -39,42 +42,41 @@ class DIContainer:
     def _setup_dependencies(self) -> None:
         """
         ⚙️ Configura todas as dependências
-
-        💡 Boa Prática: Dependency Injection Manual!
+        
+        💡 Boa Prática: Dependency Injection com Clean Architecture!
         """
-        # Infrastructure Layer
-        self.channel_repository = DiscordChannelRepository(self.bot)
-
-        # Presentation Layer
+        # 🔧 STEP 1: Cria repository de banco de dados
+        self.category_db_repository = SQLiteCategoryRepository()
+        
+        # 🔧 STEP 2: Injeta no repository Discord
+        self.channel_repository = DiscordChannelRepository(
+            self.bot, 
+            self.category_db_repository
+        )
+        
+        # 🔧 STEP 3: Cria controller com repository Discord
         self.channel_controller = ChannelController(self.channel_repository)
 
 
 class CleanArchitectureBot:
     """
     🤖 Bot principal com Arquitetura Limpa
-
-    💡 Boa Prática: Classe principal que coordena
-    toda a aplicação seguindo Clean Architecture!
+    💡 Boa Prática: Coordena toda aplicação!
     """
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.container = DIContainer(bot)
-        # 🏗️ Inicializa o manager que cuida de tudo
         self.manager = CleanArchitectureManager(bot, self.container.channel_controller)
 
     async def load_clean_extensions(self) -> str:
-        """
-        💡 Carrega extensões da Clean Architecture
+        """💡 Carrega extensões da Clean Architecture"""
+        logger.info("💡 Carregando extensões")
 
-        💡 Boa Prática: Carregamento modular e robusto!
-        """
-        logger.info("💡 Carregando extensões da Clean Architecture...")
+        loaded = []
+        failed = []
 
-        loaded = []  # Armazena extensões carregadas
-        failed = []  # Armazena falhas de carregamento
-
-        # Carrega comandos da Application Layer
+        # Comandos tradicionais
         commands_dir = Path(__file__).parent / "application" / "commands"
         if commands_dir.exists():
             for file in commands_dir.glob("*.py"):
@@ -90,7 +92,7 @@ class CleanArchitectureBot:
                         "❌ Falha comando: application.commands.%s - %s", file.stem, e
                     )
 
-        # Carrega slash commands da Application Layer
+        # Slash commands
         slash_dir = Path(__file__).parent / "application" / "slash_commands"
         if slash_dir.exists():
             for file in slash_dir.glob("*.py"):
@@ -110,7 +112,7 @@ class CleanArchitectureBot:
                         e,
                     )
 
-        # Exemplo para futuros comandos
+        # Clean commands (futuro)
         clean_commands_file = Path(__file__).parent / "clean_commands.py"
         if clean_commands_file.exists():
             try:
@@ -120,9 +122,8 @@ class CleanArchitectureBot:
             except (ImportError, ModuleNotFoundError, AttributeError) as e:
                 failed.append("clean_commands")
                 logger.warning("❌ Falha clean commands: %s", e)
-        # Fim do exemplo
 
-        status = f"✅ Clean Architecture: {len(loaded)} extensões carregadas"
+        status = f"✅ {len(loaded)} extensões carregadas"
         if failed:
             status += f", ❌{len(failed)} falharam"
 
@@ -130,30 +131,38 @@ class CleanArchitectureBot:
 
 
 def setup_logging() -> None:
-    """
-    📝 Configura logging da aplicação
-
-    💡 Boa Prática: Logging estruturado e configurável!
-    """
+    """📝 Configura logging da aplicação com cores lindas 🌈"""
     level_name = config("LOG_LEVEL", default="INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
 
-    format_string = "%(asctime)s | %(levelname)-8s | %(name)-20s | %(message)s"
-    logging.basicConfig(level=level, format=format_string, datefmt="%H:%M:%S")
+    # 🎨 Configura handler com cores
+    handler = colorlog.StreamHandler()
+    handler.setFormatter(
+        colorlog.ColoredFormatter(
+            "%(log_color)s%(asctime)s | %(levelname)-8s | %(name)-20s | %(message)s",
+            datefmt="%H:%M:%S",
+            log_colors={
+                "DEBUG": "cyan",
+                "INFO": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "red,bg_white",
+            },
+        )
+    )
+
+    # 💡 Configura logger raiz
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    root_logger.addHandler(handler)
 
     # Silencia logs verbosos do discord.py
     discord_logger = logging.getLogger("discord")
     discord_logger.setLevel(logging.WARNING)
 
-    logger.info("📝 Logging configurado: %s", level_name)
-
 
 async def start() -> None:
-    """
-    🚀 Função principal de inicialização
-
-    💡 Boa Prática: Composition Root da aplicação!
-    """
+    """🚀 Função principal de inicialização"""
     setup_logging()
 
     async with bot:
@@ -163,20 +172,16 @@ async def start() -> None:
             logger.exception("❌ Token não encontrado! Verifique .env")
             return
 
-        # 🏗️ Inicializa arquitetura limpa
         clean_bot = CleanArchitectureBot(bot)
-
-        # 💡 Carrega extensões da Clean Architecture
         status = await clean_bot.load_clean_extensions()
-        logger.info(status)
-
-        # 🚀 Inicia bot
-        logger.info("🚀 Iniciando bot com Clean Architecture...")
+        audit.info(f"{__name__} | {status}")
+        
         try:
             await bot.start(token)
         finally:
-            # 🧹 Limpeza de salas temporárias antes de fechar
             logger.info("🧹 Limpando salas temporárias antes de encerrar...")
+            audit.info(f"{__name__} | Bot encerrando - limpando recursos")
+            
             try:
                 from manager import create_manager
                 manager = create_manager(bot)
@@ -185,41 +190,74 @@ async def start() -> None:
                     removed = await manager.channel_controller.cleanup_all_temp_channels(guild)
                     if removed > 0:
                         logger.info(f"🧹 {removed} salas removidas do servidor {guild.name}")
+                        audit.info(
+                            f"{__name__} | Salas temporárias limpas ao encerrar",
+                            extra={
+                                'guild_id': guild.id,
+                                'guild_name': guild.name,
+                                'rooms_removed': removed,
+                                'action': 'cleanup_on_shutdown'
+                            }
+                        )
             except Exception as e:
                 logger.error(f"❌ Erro ao limpar salas: {str(e)}")
+                audit.error(
+                    f"{__name__} | Erro ao limpar salas temporárias: {e}",
+                    extra={'error_type': type(e).__name__, 'action': 'cleanup_on_shutdown'}
+                )
 
 
 def main() -> None:
-    """
-    🎯 Ponto de entrada principal
-    """
+    """🎯 Ponto de entrada principal"""
     try:
         asyncio.run(start())
 
     except KeyboardInterrupt:
-        logger.warning("🔴 Interrompido pelo usuário (Ctrl+C)")
+        logger.info("Bot interrompido pelo usuário (Ctrl+C)")
 
     except discord.LoginFailure:
         logger.exception("❌ Token inválido! Verifique .env")
         logger.info("💡 Dica: TOKEN=seu_token_aqui")
+        audit.critical(
+            f"{__name__} | Falha de autenticação - Token inválido",
+            extra={'error_type': 'LoginFailure'}
+        )
 
     except discord.HTTPException:
         logger.exception("❌ Erro de conexão com Discord")
         logger.info("💡 Verifique sua conexão com internet")
+        audit.error(
+            f"{__name__} | Erro de conexão HTTP com Discord",
+            extra={'error_type': 'HTTPException'}
+        )
 
     except FileNotFoundError:
         logger.exception("❌ Arquivo .env não encontrado!")
         logger.info("💡 Crie .env com: TOKEN=seu_token_aqui")
+        audit.critical(
+            f"{__name__} | Arquivo .env não encontrado",
+            extra={'error_type': 'FileNotFoundError'}
+        )
 
     except Exception as e:
         if "pickle" in str(e).lower():
             logger.exception("❌ Arquivo corrompido detectado!")
             logger.info("🔧 Remova a pasta 'json' e execute novamente")
+            audit.error(
+                f"{__name__} | Arquivo corrompido detectado",
+                extra={'error_type': 'PickleError', 'error_detail': str(e)}
+            )
         else:
             logger.exception("❌ Erro inesperado")
+            audit.critical(
+                f"{__name__} | Erro inesperado na aplicação: {e}",
+                extra={'error_type': type(e).__name__, 'error_detail': str(e)}
+            )
 
     finally:
-        logger.info("✅ Bot encerrado.")
+        audit.info(
+            f"{__name__} | ✅ Bot encerrado.",
+        )
 
 
 if __name__ == "__main__":

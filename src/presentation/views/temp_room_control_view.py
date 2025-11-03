@@ -1,8 +1,3 @@
-"""
-🎮 View de Controle de Salas Temporárias
-💡 Permite ao dono da sala controlar nome, limite de usuários e privacidade
-"""
-
 from __future__ import annotations
 
 import logging

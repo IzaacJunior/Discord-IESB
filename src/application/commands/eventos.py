@@ -14,7 +14,7 @@ import logging
 import discord
 from discord.ext import commands
 
-from infrastructure.repositories import DiscordChannelRepository
+from infrastructure.repositories import DiscordChannelRepository, SQLiteCategoryRepository
 from presentation.controllers.channel_controller import ChannelController
 
 
@@ -42,7 +42,9 @@ class Eventos(commands.Cog):
         self.bot = bot
         
         # 🏗️ Injeção de dependência correta - Clean Architecture!
-        channel_repository = DiscordChannelRepository(bot)
+        # 💡 Boa Prática: Repository de banco separado do repository Discord
+        category_db_repository = SQLiteCategoryRepository()
+        channel_repository = DiscordChannelRepository(bot, category_db_repository)
         self.channel_controller = ChannelController(channel_repository)
 
     @commands.Cog.listener()

@@ -8,6 +8,7 @@ authors = [{ name = "Izaac", email = "izaacjrrm@email.com" }]
 requires-python = ">=3.13.0"
 dependencies = [
     "aiosqlite>=0.21.0",
+    "colorlog>=6.8.0",
     "discord.py>=2.3.0",
     "pydantic>=2.11.7", 
     "python-decouple>=3.8",

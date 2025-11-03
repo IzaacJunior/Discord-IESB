@@ -1,11 +1,9 @@
 import logging
-from pathlib import Path
 
 import discord
 
-from config import DB_PATH
 from domain.entities import Channel, TextChannel, VoiceChannel
-from domain.repositories import ChannelRepository
+from domain.repositories import CategoryDatabaseRepository, ChannelRepository
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +14,24 @@ class DiscordChannelRepository(ChannelRepository):
 
     💡 Boa Prática: Implementa a interface do domain usando
     a biblioteca específica (Discord.py)!
+    
+    ✨ NOVO: Agora usa injeção de dependência para operações de banco de dados!
     """
 
-    def __init__(self, bot: discord.Client):
+    def __init__(
+        self, bot: discord.Client, category_db: CategoryDatabaseRepository
+    ):
+        """
+        Inicializa o repository com bot Discord e repository de banco de dados
+        
+        💡 Boa Prática: Injeção de Dependência (SOLID) - facilita testes e manutenção!
+        
+        Args:
+            bot: Cliente Discord.py
+            category_db: Repository para operações de categoria no banco de dados
+        """
         self.bot = bot
+        self.category_db = category_db  # 🔗 Composição ao invés de herança!
 
     async def create_text_channel(
         self,
@@ -71,14 +83,15 @@ class DiscordChannelRepository(ChannelRepository):
         category_id: int | None = None,
         user_limit: int = 0,
         bitrate: int = 64000,
-        overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite] | None = None,
+        overwrites: dict[discord.Role | discord.Member, discord.PermissionOverwrite]
+        | None = None,
     ) -> VoiceChannel:
         """
         🔊 Cria um canal de voz no Discord
 
         💡 Boa Prática: Parâmetros com valores padrão sensatos!
         🔒 Novo: Suporta cópia de permissões (overwrites) do canal original
-        
+
         Args:
             name: Nome do canal
             guild_id: ID do servidor
@@ -108,12 +121,11 @@ class DiscordChannelRepository(ChannelRepository):
             bitrate=bitrate,
             overwrites=overwrites,  # 🔒 Aplica permissões personalizadas
         )
-        
+
         # 💡 Log das permissões aplicadas
         if overwrites:
             logger.debug(
-                "🔒 Canal criado com %d permissões customizadas",
-                len(overwrites)
+                "🔒 Canal criado com %d permissões customizadas", len(overwrites)
             )
 
         # Converte para entidade do domain
@@ -137,19 +149,19 @@ class DiscordChannelRepository(ChannelRepository):
     ) -> discord.ForumChannel:
         """
         🏠 Cria um canal de fórum privado para um membro específico
-        
+
         💡 Boa Prática: Canal totalmente privado com permissões granulares!
         🔒 Segurança: Apenas o membro tem acesso total ao fórum
-        
+
         Args:
             name: Nome do canal de fórum
             guild_id: ID do servidor
             member_id: ID do membro que terá acesso exclusivo
             category_id: ID da categoria (opcional)
-            
+
         Returns:
             discord.ForumChannel: Canal de fórum criado
-            
+
         Raises:
             ValueError: Se guild ou member não forem encontrados
         """
@@ -187,10 +199,10 @@ class DiscordChannelRepository(ChannelRepository):
                 read_messages=True,
                 send_messages=True,
                 manage_messages=True,  # 🗑️ Pode deletar mensagens
-                manage_channels=True,   # ✏️ Pode editar nome e configurações
-                create_public_threads=False,   # ❌ NÃO pode criar threads públicas
+                manage_channels=True,  # ✏️ Pode editar nome e configurações
+                create_public_threads=False,  # ❌ NÃO pode criar threads públicas
                 create_private_threads=True,  # 🔒 Pode criar threads privadas
-                manage_threads=True,    # 🎛️ Pode gerenciar threads
+                manage_threads=True,  # 🎛️ Pode gerenciar threads
                 embed_links=True,
                 attach_files=True,
                 add_reactions=True,
@@ -200,21 +212,127 @@ class DiscordChannelRepository(ChannelRepository):
         }
 
         # 🏗️ Cria o canal de fórum no Discord
+        # ⏰ Sem limite de auto-arquivo: threads nunca expiram!
         forum_channel = await guild.create_forum(
             name=name,
             category=category,
             overwrites=overwrites,
             topic=f"🏠 Fórum privado de {member.display_name}",
-            default_auto_archive_duration=10080,  # 7 dias
+            default_auto_archive_duration=None,  # ♾️ Sem limite de tempo!
             default_sort_order=discord.ForumOrderType.latest_activity,
             default_layout=discord.ForumLayoutType.list_view,
+            default_reaction_emoji="📗",  # 📗 Reação padrão: Livro verde fechado!
         )
 
         logger.info(
             "✅ Fórum privado criado | nome=%s | member=%s | id=%s",
             name,
             member.display_name,
-            forum_channel.id
+            forum_channel.id,
+        )
+
+        return forum_channel
+
+    async def create_forum_channel(
+        self,
+        name: str,
+        guild_id: int,
+        category_id: int | None = None,
+        creator_id: int | None = None,
+    ) -> discord.ForumChannel:
+        """
+        📚 Cria um canal de fórum público em uma categoria
+
+        💡 Boa Prática: Canal de fórum com permissões padrão da categoria!
+        ✨ Usado para criar fóruns de turmas e discussões públicas
+        👥 NOVO: Cria role automático com mesmo nome do fórum
+        🔒 NOVO: Configura permissões do fórum baseado no role
+
+        Args:
+            name: Nome do canal de fórum
+            guild_id: ID do servidor do Discord
+            category_id: ID da categoria onde o fórum será criado (opcional)
+            creator_id: ID do criador (para criar role associado)
+
+        Returns:
+            discord.ForumChannel: Objeto do canal de fórum criado
+
+        Raises:
+            ValueError: Se o servidor não for encontrado
+        """
+        # 🔍 Busca o servidor
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            error_msg = f"❌ Servidor com ID {guild_id} não encontrado"
+            raise ValueError(error_msg)
+
+        # 📂 Busca a categoria (se fornecida)
+        category = None
+        if category_id:
+            category = guild.get_channel(category_id)
+            if not category or not isinstance(category, discord.CategoryChannel):
+                error_msg = f"❌ Categoria com ID {category_id} não encontrada"
+                raise ValueError(error_msg)
+
+        # 👥 NOVO: Cria role automático com nome do fórum
+        role_name = name.lower().replace(" ", "-")  # "Matemática" → "matemática"
+
+        # Verifica se role já existe
+        existing_role = discord.utils.get(guild.roles, name=role_name)
+        if existing_role:
+            logger.warning(
+                "⚠️ Role '%s' já existe no servidor (ID: %s)", role_name, guild_id
+            )
+            role = existing_role
+        else:
+            # Cria novo role
+            role = await guild.create_role(
+                name=role_name,
+                reason=f"📚 Role automático para fórum '{name}'",
+                color=discord.Color.blue(),  # Cor azul para fóruns
+            )
+            logger.info(
+                "✅ Role criado para fórum | role=%s | id=%s", role_name, role.id
+            )
+
+        # 🏗️ Cria o canal de fórum no Discord com PERMISSÕES especiais
+        # ⏰ Sem limite de auto-arquivo: threads nunca expiram!
+        forum_channel = await guild.create_forum(
+            name=name,
+            category=category,
+            topic=f"📚 Fórum {name}\n🔒 Acesso: Somente @{role_name}",
+            default_auto_archive_duration=None,  # ♾️ Sem limite de tempo!
+            default_sort_order=discord.ForumOrderType.latest_activity,
+            default_layout=discord.ForumLayoutType.list_view,
+            default_reaction_emoji="📗",  # 📗 Reação padrão: Livro verde fechado!
+            # 🔒 Configurações de permissão baseadas no role
+            overwrites={
+                guild.default_role: discord.PermissionOverwrite(
+                    view_channel=False,  # ❌ @everyone NÃO vê
+                    read_messages=False,
+                ),
+                role: discord.PermissionOverwrite(
+                    view_channel=True,  # ✅ Role VÊ
+                    read_messages=True,  # ✅ Lê mensagens
+                    send_messages=True,  # ✅ Envia mensagens
+                    create_public_threads=True,  # ✅ CRIA POSTS/THREADS (tags) no fórum! 📝
+                    create_private_threads=True,  # ✅ Cria tags privadas
+                    manage_threads=True,  # ✅ Gerencia suas próprias tags
+                    read_message_history=True,  # ✅ Lê histórico
+                    embed_links=True,  # ✅ Incorpora links
+                    attach_files=True,  # ✅ Anexa arquivos
+                    add_reactions=True,  # ✅ Reações
+                    use_external_emojis=True,  # ✅ Emojis externos
+                ),
+            },
+        )
+
+        logger.info(
+            "✅ Fórum público criado | nome=%s | id=%s | categoria=%s | role=%s",
+            name,
+            forum_channel.id,
+            category.name if category else "Nenhuma",
+            role_name,
         )
 
         return forum_channel
@@ -331,7 +449,9 @@ class DiscordChannelRepository(ChannelRepository):
 
         💡 Boa Prática: Usa Discord.py para verificar duplicatas!
         """
-        logger.debug("🔍 Verificando se canal '%s' existe no servidor %s", name, guild_id)
+        logger.debug(
+            "🔍 Verificando se canal '%s' existe no servidor %s", name, guild_id
+        )
 
         guild = self.bot.get_guild(guild_id)
         if not guild:
@@ -340,8 +460,10 @@ class DiscordChannelRepository(ChannelRepository):
 
         # 🔍 Busca canal por nome (case insensitive)
         for channel in guild.channels:
-            if (isinstance(channel, (discord.TextChannel, discord.VoiceChannel)) 
-                and channel.name.lower() == name.lower()):
+            if (
+                isinstance(channel, (discord.TextChannel, discord.VoiceChannel))
+                and channel.name.lower() == name.lower()
+            ):
                 logger.debug("✅ Canal '%s' encontrado no servidor %s", name, guild_id)
                 return True
 
@@ -367,11 +489,14 @@ class DiscordChannelRepository(ChannelRepository):
 
         # 🔍 Busca canal por nome (case insensitive)
         for discord_channel in guild.channels:
-            if (isinstance(discord_channel, (discord.TextChannel, discord.VoiceChannel))
-                and discord_channel.name.lower() == name.lower()):
-                
-                logger.debug("✅ Canal '%s' encontrado: ID %s", name, discord_channel.id)
-                
+            if (
+                isinstance(discord_channel, (discord.TextChannel, discord.VoiceChannel))
+                and discord_channel.name.lower() == name.lower()
+            ):
+                logger.debug(
+                    "✅ Canal '%s' encontrado: ID %s", name, discord_channel.id
+                )
+
                 # Converte para entidade do domain
                 if isinstance(discord_channel, discord.TextChannel):
                     return TextChannel(
@@ -383,7 +508,7 @@ class DiscordChannelRepository(ChannelRepository):
                         else None,
                         topic=discord_channel.topic,
                     )
-                elif isinstance(discord_channel, discord.VoiceChannel):
+                if isinstance(discord_channel, discord.VoiceChannel):
                     return VoiceChannel(
                         id=discord_channel.id,
                         name=discord_channel.name,
@@ -406,47 +531,20 @@ class DiscordChannelRepository(ChannelRepository):
     ) -> bool:
         """
         🔍 Verifica se categoria está marcada como geradora de salas temporárias
-        
-        💡 Boa Prática: Consulta banco de dados para verificar configuração
-        
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+        ✨ Responsabilidade Única: Discord repo não faz SQL!
+
         Args:
             category_id: ID da categoria Discord
             guild_id: ID do servidor Discord
             category_name: Nome da categoria (opcional, para logs)
-            
+
         Returns:
             bool: True se categoria gera salas temporárias
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            # 💖 Log com nome bonito se disponível
-            display_name = f"'{category_name}'" if category_name else f"ID {category_id}"
-            logger.info("🔍 Verificando se categoria %s é temp generator", display_name)
-            
-            # 🔍 Conecta ao banco de dados
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                cursor = await db.execute(
-                    """
-                    SELECT is_active FROM temp_room_categories 
-                    WHERE category_id = ? AND guild_id = ?
-                    """,
-                    (category_id, guild_id)
-                )
-                row = await cursor.fetchone()
-                
-                if row and row[0] == 1:  # is_active = 1
-                    logger.info("✅ Categoria %s é geradora ativa", display_name)
-                    return True
-                else:
-                    logger.debug("❌ Categoria %s não é geradora", display_name)
-                    return False
-            
-        except Exception as e:
-            logger.error("❌ Erro ao verificar categoria: %s", str(e))
-            return False
+        # � Delega para o repository de banco de dados
+        return await self.category_db.is_temp_room_category(category_id, guild_id)
 
     async def mark_category_as_temp_generator(
         self,
@@ -456,50 +554,21 @@ class DiscordChannelRepository(ChannelRepository):
     ) -> bool:
         """
         💾 Marca categoria como geradora de salas temporárias
-        
-        💡 Boa Prática: Persiste no banco para uso posterior
-        
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
             category_id: ID da categoria Discord
             category_name: Nome da categoria
             guild_id: ID do servidor Discord
-            
+
         Returns:
             bool: True se marcação foi bem-sucedida
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.info("💾 Marcando categoria %s como temp generator", category_name)
-            
-            # 💾 Salva no banco de dados
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                await db.execute(
-                    """
-                    INSERT INTO temp_room_categories 
-                        (category_id, category_name, guild_id, is_active)
-                    VALUES (?, ?, ?, 1)
-                    ON CONFLICT(category_id, guild_id) 
-                    DO UPDATE SET is_active = 1, updated_at = CURRENT_TIMESTAMP
-                    """,
-                    (category_id, category_name, guild_id)
-                )
-                await db.commit()
-            
-            logger.info(
-                "✅ Categoria %s (ID: %s) marcada como temp generator para guild %s",
-                category_name,
-                category_id,
-                guild_id
-            )
-            
-            return True
-            
-        except Exception as e:
-            logger.error("❌ Erro ao marcar categoria: %s", str(e))
-            return False
+        # 🔗 Delega para o repository de banco de dados
+        return await self.category_db.mark_category_as_temp_generator(
+            category_id, category_name, guild_id
+        )
 
     async def unmark_category_as_temp_generator(
         self,
@@ -508,44 +577,20 @@ class DiscordChannelRepository(ChannelRepository):
     ) -> bool:
         """
         🗑️ Remove marcação de categoria como geradora de salas temporárias
-        
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
             category_id: ID da categoria Discord
             guild_id: ID do servidor Discord
-            
+
         Returns:
             bool: True se remoção foi bem-sucedida
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.info("🗑️ Removendo marcação de categoria ID %s", category_id)
-            
-            # 🗑️ Remove do banco de dados (marca como inativa)
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                cursor = await db.execute(
-                    """
-                    UPDATE temp_room_categories 
-                    SET is_active = 0, updated_at = CURRENT_TIMESTAMP
-                    WHERE category_id = ? AND guild_id = ?
-                    """,
-                    (category_id, guild_id)
-                )
-                await db.commit()
-                
-                # Verifica se alguma linha foi afetada
-                if cursor.rowcount > 0:
-                    logger.info("✅ Categoria ID %s desmarcada para guild %s", category_id, guild_id)
-                    return True
-                else:
-                    logger.warning("⚠️ Categoria ID %s não estava marcada", category_id)
-                    return False
-            
-        except Exception as e:
-            logger.error("❌ Erro ao desmarcar categoria: %s", str(e))
-            return False
+        # � Delega para o repository de banco de dados
+        return await self.category_db.unmark_category_as_temp_generator(
+            category_id, guild_id
+        )
 
     async def get_temp_channels_by_category(
         self,
@@ -554,56 +599,20 @@ class DiscordChannelRepository(ChannelRepository):
     ) -> list[int]:
         """
         🔍 Busca todos os canais temporários de uma categoria
-        
-        💡 Boa Prática: Retorna lista de IDs para processamento em batch
-        
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
             category_id: ID da categoria Discord
             guild_id: ID do servidor Discord
-            
+
         Returns:
             list[int]: Lista com IDs dos canais temporários ativos
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.info(
-                "🔍 Buscando canais temporários da categoria ID %s", 
-                category_id
-            )
-            
-            # 🔍 Consulta banco de dados
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                cursor = await db.execute(
-                    """
-                    SELECT channel_id 
-                    FROM temporary_channels 
-                    WHERE category_id = ? AND guild_id = ? AND is_active = 1
-                    ORDER BY created_at
-                    """,
-                    (category_id, guild_id)
-                )
-                rows = await cursor.fetchall()
-                
-                # 📋 Extrai IDs dos canais
-                channel_ids = [row[0] for row in rows]
-                
-                logger.info(
-                    "✅ Encontrados %d canais temporários na categoria %s",
-                    len(channel_ids),
-                    category_id
-                )
-                
-                return channel_ids
-            
-        except Exception as e:
-            logger.error(
-                "❌ Erro ao buscar canais temporários: %s", 
-                str(e)
-            )
-            return []
+        # 🔗 Delega para o repository de banco de dados
+        return await self.category_db.get_temp_channels_by_category(
+            category_id, guild_id
+        )
 
     async def is_temporary_channel(
         self,
@@ -612,42 +621,18 @@ class DiscordChannelRepository(ChannelRepository):
     ) -> bool:
         """
         🔍 Verifica se canal é uma sala temporária ativa
-        
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
             channel_id: ID do canal Discord
             guild_id: ID do servidor Discord
-            
+
         Returns:
             bool: True se canal é temporário e ativo
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.debug("🔍 Verificando se canal %s é temporário", channel_id)
-            
-            # 🔍 Consulta banco de dados
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                cursor = await db.execute(
-                    """
-                    SELECT is_active FROM temporary_channels 
-                    WHERE channel_id = ? AND guild_id = ?
-                    """,
-                    (channel_id, guild_id)
-                )
-                row = await cursor.fetchone()
-                
-                if row and row[0] == 1:  # is_active = 1
-                    logger.debug("✅ Canal %s é temporário ativo", channel_id)
-                    return True
-                else:
-                    logger.debug("❌ Canal %s não é temporário", channel_id)
-                    return False
-            
-        except Exception as e:
-            logger.error("❌ Erro ao verificar canal temporário: %s", str(e))
-            return False
+        # 🔗 Delega para o repository de banco de dados
+        return await self.category_db.is_temporary_channel(channel_id, guild_id)
 
     # ═══════════════════════════════════════════════════════════════
     # 🏠 GERENCIAMENTO DE FÓRUNS ÚNICOS POR MEMBRO
@@ -659,124 +644,37 @@ class DiscordChannelRepository(ChannelRepository):
         guild_id: int,
     ) -> bool:
         """
-        🔍 Verifica se categoria está marcada para criar fóruns únicos.
-        
-        💡 Boa Prática: Consulta banco de dados para verificar configuração
-        
+        🔍 Verifica se categoria está marcada para criar fóruns únicos
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
             category_id: ID da categoria Discord
             guild_id: ID do servidor Discord
-            
+
         Returns:
             bool: True se categoria cria fóruns únicos
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.debug(
-                "🔍 Verificando se categoria %s gera fóruns únicos", 
-                category_id
-            )
-            
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                cursor = await db.execute(
-                    """
-                    SELECT category_name FROM unique_channel_categories
-                    WHERE category_id = ? AND guild_id = ?
-                    """,
-                    (category_id, guild_id)
-                )
-                row = await cursor.fetchone()
-                
-                if row:
-                    logger.debug(
-                        "✅ Categoria '%s' gera fóruns únicos", 
-                        row[0]
-                    )
-                    return True
-                else:
-                    logger.debug(
-                        "❌ Categoria %s não gera fóruns únicos", 
-                        category_id
-                    )
-                    return False
-                
-        except Exception as e:
-            logger.error(
-                "❌ Erro ao verificar categoria única: %s", 
-                str(e)
-            )
-            return False
+        # 🔗 Delega para o repository de banco de dados
+        return await self.category_db.is_unique_channel_category(category_id, guild_id)
 
     async def get_unique_channel_category(
         self,
         guild_id: int,
-    ) -> dict | None:
+    ) -> tuple[int, str] | None:
         """
-        🔍 Busca a categoria configurada para fóruns únicos no servidor.
-        
-        💡 Boa Prática: Apenas UMA categoria por guilda
-        
+        🔍 Busca a categoria configurada para fóruns únicos no servidor
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
             guild_id: ID do servidor Discord
-            
+
         Returns:
-            dict | None: Informações da categoria ou None se não configurada
-                {
-                    "category_id": int,
-                    "category_name": str,
-                    "created_at": str
-                }
+            tuple[int, str] | None: (category_id, category_name) ou None
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.debug(
-                "🔍 Buscando categoria configurada para guilda %s",
-                guild_id
-            )
-            
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                cursor = await db.execute(
-                    """
-                    SELECT category_id, category_name, created_at
-                    FROM unique_channel_categories
-                    WHERE guild_id = ?
-                    LIMIT 1
-                    """,
-                    (guild_id,)
-                )
-                row = await cursor.fetchone()
-                
-                if row:
-                    category_data = {
-                        "category_id": row[0],
-                        "category_name": row[1],
-                        "created_at": row[2]
-                    }
-                    logger.debug(
-                        "✅ Categoria configurada encontrada: '%s' (ID: %s)",
-                        category_data["category_name"],
-                        category_data["category_id"]
-                    )
-                    return category_data
-                else:
-                    logger.debug(
-                        "❌ Nenhuma categoria configurada para guilda %s",
-                        guild_id
-                    )
-                    return None
-                
-        except Exception as e:
-            logger.error(
-                "❌ Erro ao buscar categoria configurada: %s",
-                str(e)
-            )
-            return None
+        # 🔗 Delega para o repository de banco de dados
+        return await self.category_db.get_unique_channel_category(guild_id)
 
     async def mark_category_as_unique_generator(
         self,
@@ -785,141 +683,40 @@ class DiscordChannelRepository(ChannelRepository):
         guild_id: int,
     ) -> bool:
         """
-        💾 Marca categoria como geradora de fóruns únicos por membro.
-        
-        💡 Boa Prática: Apenas UMA categoria por guilda
-        🔒 Remove categoria antiga se já existir e adiciona nova
-        
+        💾 Marca categoria como geradora de fóruns únicos por membro
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
             category_id: ID da categoria Discord
             category_name: Nome da categoria
             guild_id: ID do servidor Discord
-            
+
         Returns:
             bool: True se marcação foi bem-sucedida
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.info(
-                "💾 Marcando categoria '%s' como geradora de fóruns únicos",
-                category_name
-            )
-            
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                # 🔍 STEP 1: Verifica se já existe categoria configurada nesta guilda
-                cursor = await db.execute(
-                    """
-                    SELECT category_id, category_name 
-                    FROM unique_channel_categories
-                    WHERE guild_id = ?
-                    """,
-                    (guild_id,)
-                )
-                existing = await cursor.fetchone()
-                
-                # 🗑️ STEP 2: Se já existe, remove a antiga
-                if existing:
-                    old_category_id, old_category_name = existing
-                    
-                    logger.info(
-                        "🔄 Substituindo categoria antiga '%s' (ID: %s) por '%s' (ID: %s)",
-                        old_category_name,
-                        old_category_id,
-                        category_name,
-                        category_id
-                    )
-                    
-                    await db.execute(
-                        """
-                        DELETE FROM unique_channel_categories
-                        WHERE guild_id = ?
-                        """,
-                        (guild_id,)
-                    )
-                
-                # ✅ STEP 3: Insere nova categoria
-                await db.execute(
-                    """
-                    INSERT INTO unique_channel_categories 
-                    (category_id, category_name, guild_id)
-                    VALUES (?, ?, ?)
-                    """,
-                    (category_id, category_name, guild_id)
-                )
-                await db.commit()
-                
-                logger.info(
-                    "✅ Categoria '%s' marcada com sucesso (única para esta guilda)",
-                    category_name
-                )
-                return True
-                
-        except Exception as e:
-            logger.error(
-                "❌ Erro ao marcar categoria: %s", 
-                str(e)
-            )
-            return False
+        # 🔗 Delega para o repository de banco de dados
+        return await self.category_db.mark_category_as_unique_generator(
+            category_id, category_name, guild_id
+        )
 
     async def unmark_category_as_unique_generator(
         self,
-        category_id: int,
         guild_id: int,
     ) -> bool:
         """
-        🗑️ Remove marcação de categoria como geradora de fóruns únicos.
-        
-        💡 Boa Prática: Remove apenas configuração, mantém registros de canais
-        
+        🗑️ Remove marcação de categoria como geradora de fóruns únicos
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
-            category_id: ID da categoria Discord
             guild_id: ID do servidor Discord
-            
+
         Returns:
             bool: True se remoção foi bem-sucedida
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.info(
-                "🗑️ Removendo marcação da categoria ID %s",
-                category_id
-            )
-            
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                cursor = await db.execute(
-                    """
-                    DELETE FROM unique_channel_categories
-                    WHERE category_id = ? AND guild_id = ?
-                    """,
-                    (category_id, guild_id)
-                )
-                await db.commit()
-                
-                if cursor.rowcount > 0:
-                    logger.info(
-                        "✅ Categoria ID %s desmarcada com sucesso",
-                        category_id
-                    )
-                    return True
-                else:
-                    logger.warning(
-                        "⚠️ Categoria ID %s não estava marcada",
-                        category_id
-                    )
-                    return False
-                
-        except Exception as e:
-            logger.error(
-                "❌ Erro ao desmarcar categoria: %s", 
-                str(e)
-            )
-            return False
+        # � Delega para o repository de banco de dados
+        return await self.category_db.unmark_category_as_unique_generator(guild_id)
 
     async def member_has_unique_channel_in_category(
         self,
@@ -928,65 +725,22 @@ class DiscordChannelRepository(ChannelRepository):
         guild_id: int,
     ) -> bool:
         """
-        🔍 Verifica se membro JÁ possui fórum único nesta categoria.
-        
-        💡 Boa Prática: Evita criar canais duplicados para o mesmo membro
-        
+        🔍 Verifica se membro JÁ possui fórum único nesta categoria
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
             member_id: ID do membro Discord
             category_id: ID da categoria Discord
             guild_id: ID do servidor Discord
-            
+
         Returns:
             bool: True se membro já tem canal nesta categoria
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.debug(
-                "🔍 Verificando se membro %s tem canal na categoria %s",
-                member_id,
-                category_id
-            )
-            
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                cursor = await db.execute(
-                    """
-                    SELECT channel_id, channel_name 
-                    FROM member_unique_channels
-                    WHERE member_id = ? 
-                    AND category_id = ? 
-                    AND guild_id = ?
-                    AND is_active = 1
-                    """,
-                    (member_id, category_id, guild_id)
-                )
-                row = await cursor.fetchone()
-                
-                if row:
-                    logger.debug(
-                        "✅ Membro %s já tem canal '%s' (ID: %s)",
-                        member_id,
-                        row[1],
-                        row[0]
-                    )
-                    return True
-                else:
-                    logger.debug(
-                        "❌ Membro %s não tem canal na categoria %s",
-                        member_id,
-                        category_id
-                    )
-                    return False
-                
-        except Exception as e:
-            logger.error(
-                "❌ Erro ao verificar canal do membro: %s", 
-                str(e)
-            )
-            return False
+        # 🔗 Delega para o repository de banco de dados
+        return await self.category_db.member_has_unique_channel_in_category(
+            member_id, category_id, guild_id
+        )
 
     async def register_member_unique_channel(
         self,
@@ -997,66 +751,24 @@ class DiscordChannelRepository(ChannelRepository):
         category_id: int,
     ) -> bool:
         """
-        💾 Registra fórum único criado para um membro.
-        
-        💡 Boa Prática: Relaciona membro com canal para controle
-        🔒 UNIQUE constraint evita duplicatas
-        
+        💾 Registra fórum único criado para um membro
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
             member_id: ID do membro Discord
             channel_id: ID do canal criado
             channel_name: Nome do canal
             guild_id: ID do servidor Discord
             category_id: ID da categoria onde o canal está
-            
+
         Returns:
             bool: True se registro foi bem-sucedido
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.info(
-                "💾 Registrando canal único '%s' para membro %s",
-                channel_name,
-                member_id
-            )
-            
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                try:
-                    await db.execute(
-                        """
-                        INSERT INTO member_unique_channels
-                        (member_id, channel_id, channel_name, guild_id, category_id, is_active)
-                        VALUES (?, ?, ?, ?, ?, 1)
-                        """,
-                        (member_id, channel_id, channel_name, guild_id, category_id)
-                    )
-                    await db.commit()
-                    
-                    logger.info(
-                        "✅ Canal '%s' registrado para membro %s",
-                        channel_name,
-                        member_id
-                    )
-                    return True
-                    
-                except aiosqlite.IntegrityError:
-                    # Membro já tem canal nesta categoria
-                    logger.warning(
-                        "⚠️ Membro %s já tem canal na categoria %s",
-                        member_id,
-                        category_id
-                    )
-                    return False
-                
-        except Exception as e:
-            logger.error(
-                "❌ Erro ao registrar canal único: %s", 
-                str(e)
-            )
-            return False
+        # � Delega para o repository de banco de dados
+        return await self.category_db.register_member_unique_channel(
+            member_id, channel_id, channel_name, guild_id, category_id
+        )
 
     async def get_member_unique_channels(
         self,
@@ -1064,67 +776,16 @@ class DiscordChannelRepository(ChannelRepository):
         guild_id: int,
     ) -> list[dict]:
         """
-        📋 Lista todos os fóruns únicos de um membro no servidor.
-        
-        💡 Útil para debug e listagem de canais do membro
-        
+        📋 Lista todos os fóruns únicos de um membro no servidor
+
+        💡 Boa Prática: Delega para o CategoryDatabaseRepository!
+
         Args:
             member_id: ID do membro Discord
             guild_id: ID do servidor Discord
-            
+
         Returns:
             list[dict]: Lista com informações dos canais
         """
-        import aiosqlite
-        from pathlib import Path
-        
-        try:
-            logger.debug(
-                "📋 Buscando canais únicos do membro %s",
-                member_id
-            )
-            
-            db_path = DB_PATH
-            async with aiosqlite.connect(db_path) as db:
-                cursor = await db.execute(
-                    """
-                    SELECT 
-                        channel_id,
-                        channel_name,
-                        category_id,
-                        created_at,
-                        is_active
-                    FROM member_unique_channels
-                    WHERE member_id = ? AND guild_id = ?
-                    ORDER BY created_at DESC
-                    """,
-                    (member_id, guild_id)
-                )
-                rows = await cursor.fetchall()
-                
-                channels = [
-                    {
-                        "channel_id": row[0],
-                        "channel_name": row[1],
-                        "category_id": row[2],
-                        "created_at": row[3],
-                        "is_active": bool(row[4]),
-                    }
-                    for row in rows
-                ]
-                
-                logger.debug(
-                    "✅ Encontrados %d canais para membro %s",
-                    len(channels),
-                    member_id
-                )
-                
-                return channels
-                
-        except Exception as e:
-            logger.error(
-                "❌ Erro ao buscar canais do membro: %s", 
-                str(e)
-            )
-            return []
-
+        # 🔗 Delega para o repository de banco de dados
+        return await self.category_db.get_member_unique_channels(member_id, guild_id)
