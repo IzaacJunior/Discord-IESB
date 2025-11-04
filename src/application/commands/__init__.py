@@ -9,6 +9,6 @@ from .member import Normy
 
 __all__ = [
     "ADM",
-    "Eventos", 
+    "Eventos",
     "Normy",
 ]

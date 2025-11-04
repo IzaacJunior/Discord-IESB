@@ -9,6 +9,6 @@ from .stats_subscriber import UserStatsSubscriber
 
 __all__ = [
     "AnalyticsSubscriber",
-    "UserStatsSubscriber",
     "NotificationSubscriber",
+    "UserStatsSubscriber",
 ]

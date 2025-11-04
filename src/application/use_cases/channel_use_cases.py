@@ -126,7 +126,7 @@ class CreateChannelUseCase:
                 created=True,  # ✅ Criado com sucesso
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("❌ Falha ao criar canal: %s", request.name)
 
             # 💡 Retorna resposta de falha
@@ -192,7 +192,7 @@ class CreateChannelUseCase:
                 channel_id,
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("❌ Erro ao salvar canal temporário no banco: %s")
             return False
         else:
@@ -231,7 +231,7 @@ class CreateChannelUseCase:
             await self.event_bus.publish(event)
             logger.debug("📢 Evento publicado: %s", event.event_type)
 
-        except Exception as e:
+        except Exception:
             # 🛡️ Não quebra criação do canal se evento falhar
             logger.exception("❌ Erro ao publicar evento de canal criado: %s")
 
@@ -423,7 +423,7 @@ class CreateForumUseCase:
                 created=True,  # ✅ Criado com sucesso
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("❌ Falha ao criar fórum: %s", forum_name)
 
             # 💡 Retorna resposta de falha

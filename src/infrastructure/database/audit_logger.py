@@ -6,13 +6,14 @@
 
 import json
 import logging
-import colorlog
 import sqlite3
 import threading
 from datetime import datetime
 from pathlib import Path
 from queue import Queue
 from typing import Any
+
+import colorlog
 
 from config import AUDIT_DB_PATH
 
@@ -271,9 +272,7 @@ class DatabaseLogHandler(logging.Handler):
         super().close()
 
 
-def get_audit_logger(
-    name: str = "audit", level: int = logging.INFO
-) -> logging.Logger:
+def get_audit_logger(name: str = "audit", level: int = logging.INFO) -> logging.Logger:
     """
     🎯 Factory function para criar logger de auditoria configurado.
 

@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands
 
-from infrastructure.repositories import DiscordChannelRepository, SQLiteCategoryRepository
+from infrastructure.repositories import (
+    DiscordChannelRepository,
+    SQLiteCategoryRepository,
+)
 from presentation.controllers.channel_controller import ChannelController
 
 if TYPE_CHECKING:

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
 import logging
@@ -142,7 +142,7 @@ class ChannelController:
                 case False:
                     if result.id > 0:
                         await interaction.response.send_message(
-                            f"?? Canal **{result.name}** j� existe! N�o criado duplicata.",
+                            "?? Canal já existe! Não criado duplicata.",
                             ephemeral=True,
                         )
                     else:
@@ -159,7 +159,9 @@ class ChannelController:
             )
 
     async def handle_create_member_text_channel(
-        self, member: discord.Member, category_id: int | None = None
+        self,
+        member: discord.Member,
+        category_id: int | None = None,
     ) -> bool:
         """
         Cria fórum privado para novo membro
@@ -205,16 +207,18 @@ class ChannelController:
                         f"## Olá, {member.mention}!\n\n"
                         f"Este é o seu **fórum privado pessoal**!\n\n"
                         f"### O que você pode fazer aqui:\n"
-                        f"-  **Criar threads privadas**: Clique em 'Nova Postagem' para criar tópicos privados\n"
-                        f"-  **Editar o nome**: Clique com botão direito no canal 'Editar Canal'\n"
-                        f"-  **Gerenciar mensagens**: Delete ou edite qualquer mensagem\n"
-                        f"-  **Privacidade total**: Apenas você pode ver este canal e seus posts!\n"
-                        f"-  **Personalizar**: Mude o nome, descrição, tags e tudo mais!\n\n"
+                        f"-  **Criar threads privadas**: Clique em 'Nova Postagem'\n"
+                        f"   para criar tópicos privados\n"
+                        f"-  **Editar o nome**: Clique com botão direito em 'Editar Canal'\n"
+                        f"-  **Gerenciar mensagens**: Delete ou edite mensagens\n"
+                        f"-  **Privacidade total**: Apenas você pode ver este canal\n"
+                        f"   e seus posts!\n"
+                        f"-  **Personalizar**: Mude nome, descrição, tags e tudo mais!\n\n"
                         f"### Dicas:\n"
                         f"- Use tags para organizar seus tópicos\n"
-                        f"- Threads são arquivadas automaticamente após 7 dias de inatividade\n"
+                        f"- Threads são arquivadas após 7 dias de inatividade\n"
                         f"- Você tem controle total sobre este espaço!\n"
-                        f"- **Importante**: Você só pode criar posts PRIVADOS (não públicos)\n\n"
+                        f"- **Importante**: Criar posts PRIVADOS (não públicos)\n\n"
                         f"**Divirta-se organizando suas ideias!**"
                     ),
                 )
@@ -241,9 +245,10 @@ class ChannelController:
                 forum_channel.id,
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "Erro ao criar fórum para membro %s", member.display_name
+                "Erro ao criar fórum para membro %s",
+                member.display_name,
             )
             return False
         else:
@@ -320,7 +325,6 @@ class ChannelController:
         else:
             return True
 
-
     # ---------------------------------------------------------------
     # GERENCIAMENTO DE SALAS TEMPORÁRIAS
     # ---------------------------------------------------------------
@@ -346,14 +350,18 @@ class ChannelController:
                 and before.channel != after.channel
             ):
                 logger.debug(
-                    "ENTRADA: %s -> '%s'", member.display_name, after.channel.name
+                    "ENTRADA: %s -> '%s'",
+                    member.display_name,
+                    after.channel.name,
                 )
                 await self._handle_channel_entry(member, after)
 
             # Saída de canal
             if before.channel and before.channel != after.channel:
                 logger.debug(
-                    "SAÍDA: %s -> '%s'", member.display_name, before.channel.name
+                    "SAÍDA: %s -> '%s'",
+                    member.display_name,
+                    before.channel.name,
                 )
                 await self._handle_channel_exit(member, before)
 
@@ -364,7 +372,9 @@ class ChannelController:
             return True
 
     async def _handle_channel_entry(
-        self, member: discord.Member, after: discord.VoiceState
+        self,
+        member: discord.Member,
+        after: discord.VoiceState,
     ) -> bool:
         """
         Processa entrada em canal de voz.
@@ -385,12 +395,14 @@ class ChannelController:
 
         # CHECK 1: Já está em sala temporária?
         is_temp_channel = await self.channel_repository.is_temporary_channel(
-            channel_id=after.channel.id, guild_id=member.guild.id
+            channel_id=after.channel.id,
+            guild_id=member.guild.id,
         )
 
         if is_temp_channel:
             logger.info(
-                "IGNORADO: %s entrou em sala temporária existente", member.display_name
+                "IGNORADO: %s entrou em sala temporária existente",
+                member.display_name,
             )
             return True
 
@@ -407,7 +419,8 @@ class ChannelController:
 
         if not is_generator_category:
             logger.info(
-                "IGNORADO: Categoria '%s' não é geradora", after.channel.category.name
+                "IGNORADO: Categoria '%s' não é geradora",
+                after.channel.category.name,
             )
             return False
 
@@ -416,7 +429,9 @@ class ChannelController:
         return await self._create_temporary_room(member, after)
 
     async def _create_temporary_room(
-        self, member: discord.Member, after: discord.VoiceState
+        self,
+        member: discord.Member,
+        after: discord.VoiceState,
     ) -> bool:
         """
         Cria sala temporária para o membro.
@@ -469,7 +484,8 @@ class ChannelController:
 
             if result.id > 0:
                 # Envia embed com controles ANTES de mover (evita duplicatas)
-                # Boa Prática: Envia embed APENAS se sala foi CRIADA (result.created = True)
+                # Boa Prática: Envia embed APENAS se sala foi CRIADA
+                # (result.created = True)
                 new_channel = member.guild.get_channel(result.id)
 
                 if new_channel and isinstance(new_channel, discord.VoiceChannel):
@@ -486,24 +502,28 @@ class ChannelController:
                                 timeout=None,  # View nunca expira
                             )
 
-                            # Envia diretamente no canal de voz (como mensagem inicial)
+                            # Envia diretamente no canal de voz
+                            # (como mensagem inicial)
                             await new_channel.send(
-                                content=f"{member.mention} Bem-vindo à sua sala temporária!",
+                                content=(
+                                    f"{member.mention} Bem-vindo à sua sala temporária!"
+                                ),
                                 embed=embed,
                                 view=view,
                             )
 
                             logger.info(
-                                "Embed de controle enviada APENAS na criação | canal_voz=%s",
+                                "Embed de controle enviada APENAS na criação "
+                                "| canal_voz=%s",
                                 new_channel.name,
                             )
 
                         except (
                             discord.HTTPException,
                             discord.Forbidden,
-                        ) as embed_error:
+                        ):
                             logger.exception(
-                                "Erro ao enviar embed de controle"
+                                "Erro ao enviar embed de controle",
                             )
                             # Não falha a criação da sala se embed der erro
                     else:
@@ -533,7 +553,9 @@ class ChannelController:
             return True
 
     async def _handle_channel_exit(
-        self, member: discord.Member, before: discord.VoiceState
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
     ) -> bool:
         """
         Processa saída de canal de voz.
@@ -551,7 +573,8 @@ class ChannelController:
 
         # Verifica se é sala temporária
         is_temp_channel = await self.channel_repository.is_temporary_channel(
-            channel_id=before.channel.id, guild_id=member.guild.id
+            channel_id=before.channel.id,
+            guild_id=member.guild.id,
         )
 
         if not is_temp_channel:
@@ -607,14 +630,15 @@ class ChannelController:
 
             # Remove do Discord
             await channel_check.delete(
-                reason=f"Sala temporária vazia - último usuário: {member.display_name}"
+                reason=f"Sala temporária vazia - último usuário: {member.display_name}",
             )
 
             logger.info("Sala temporária '%s' removida com sucesso", channel_check.name)
 
-        except (discord.HTTPException, discord.Forbidden) as delete_error:
+        except (discord.HTTPException, discord.Forbidden):
             logger.exception(
-                "Erro ao deletar canal '%s'", before.channel.name
+                "Erro ao deletar canal '%s'",
+                before.channel.name,
             )
             return False
         else:
@@ -625,7 +649,9 @@ class ChannelController:
     # ---------------------------------------------------------------
 
     async def handle_mark_category_as_temp_generator(
-        self, category: discord.CategoryChannel, guild_id: int
+        self,
+        category: discord.CategoryChannel,
+        guild_id: int,
     ) -> bool:
         """
         Marca categoria como geradora de salas temporárias.
@@ -636,7 +662,8 @@ class ChannelController:
 
             # Verifica se já está marcada
             is_already_marked = await self.channel_repository.is_temp_room_category(
-                category_id=category.id, guild_id=guild_id
+                category_id=category.id,
+                guild_id=guild_id,
             )
 
             if is_already_marked:
@@ -645,7 +672,9 @@ class ChannelController:
 
             # Marca categoria
             success = await self.channel_repository.mark_category_as_temp_generator(
-                category_id=category.id, category_name=category.name, guild_id=guild_id
+                category_id=category.id,
+                category_name=category.name,
+                guild_id=guild_id,
             )
 
             if success:
@@ -660,7 +689,9 @@ class ChannelController:
             return success
 
     async def handle_unmark_category_as_temp_generator(
-        self, category_id: int, guild_id: int
+        self,
+        category_id: int,
+        guild_id: int,
     ) -> bool:
         """
         Remove marcação de categoria e deleta todas salas temporárias
@@ -676,7 +707,8 @@ class ChannelController:
 
             # Primeiro busca todos os canais temporários dessa categoria
             channel_ids = await self.channel_repository.get_temp_channels_by_category(
-                category_id=category_id, guild_id=guild_id
+                category_id=category_id,
+                guild_id=guild_id,
             )
 
             # Deleta todos os canais temporários encontrados
@@ -692,7 +724,7 @@ class ChannelController:
                     try:
                         # Deleta canal do Discord
                         success = await self.channel_repository.delete_channel(
-                            channel_id=channel_id
+                            channel_id=channel_id,
                         )
 
                         if success:
@@ -700,10 +732,11 @@ class ChannelController:
                             logger.debug("Canal %s deletado", channel_id)
                         else:
                             logger.warning(
-                                "Canal %s não encontrado no Discord", channel_id
+                                "Canal %s não encontrado no Discord",
+                                channel_id,
                             )
 
-                    except (discord.HTTPException, discord.Forbidden) as channel_error:
+                    except (discord.HTTPException, discord.Forbidden):
                         logger.exception(
                             "Erro ao deletar canal %s",
                             channel_id,
@@ -726,7 +759,8 @@ class ChannelController:
 
             # Remove marcação da categoria (independente dos canais)
             success = await self.channel_repository.unmark_category_as_temp_generator(
-                category_id=category_id, guild_id=guild_id
+                category_id=category_id,
+                guild_id=guild_id,
             )
 
             if success:
@@ -750,7 +784,9 @@ class ChannelController:
     # ---------------------------------------------------------------
 
     async def handle_mark_category_as_unique_generator(
-        self, category: discord.CategoryChannel, guild_id: int
+        self,
+        category: discord.CategoryChannel,
+        guild_id: int,
     ) -> bool:
         """
         Marca categoria como geradora de fóruns únicos por membro.
@@ -766,7 +802,9 @@ class ChannelController:
 
             # Marca categoria no banco de dados
             success = await self.channel_repository.mark_category_as_unique_generator(
-                category_id=category.id, category_name=category.name, guild_id=guild_id
+                category_id=category.id,
+                category_name=category.name,
+                guild_id=guild_id,
             )
 
             if success:
@@ -781,7 +819,9 @@ class ChannelController:
             return success
 
     async def handle_unmark_category_as_unique_generator(
-        self, category_id: int, guild_id: int
+        self,
+        category_id: int,
+        guild_id: int,
     ) -> bool:
         """
         Remove marcação de categoria como geradora de fóruns únicos.
@@ -796,7 +836,8 @@ class ChannelController:
 
             # Remove marcação do banco
             success = await self.channel_repository.unmark_category_as_unique_generator(
-                category_id=category_id, guild_id=guild_id
+                category_id=category_id,
+                guild_id=guild_id,
             )
 
             if success:
@@ -811,7 +852,9 @@ class ChannelController:
             return success
 
     async def handle_create_unique_member_channel(
-        self, member: discord.Member, category_id: int
+        self,
+        member: discord.Member,
+        category_id: int,
     ) -> bool:
         """
         Cria fórum privado único para membro em categoria específica.
@@ -878,7 +921,8 @@ class ChannelController:
 
             if registered:
                 logger.info(
-                    "Fórum único criado e registrado | member=%s | channel=%s | category=%s",
+                    "Fórum único criado e registrado | member=%s | "
+                    "channel=%s | category=%s",
                     member.display_name,
                     forum_channel.name,
                     category_id,
@@ -886,22 +930,26 @@ class ChannelController:
 
                 # Envia mensagem de boas-vindas no fórum
                 try:
-                    welcome_thread = await forum_channel.create_thread(
+                    await forum_channel.create_thread(
                         name="Bem-vindo ao seu espaço único!",
                         content=(
                             f"## Olá, {member.mention}!\n\n"
                             f"Este é o seu **fórum privado único**! 🎉\n\n"
                             f"### Características especiais:\n"
                             f"- 🔒 **Totalmente privado**: Apenas você pode ver!\n"
-                            f"- ✏️ **Personalizável**: Edite nome, descrição e tudo mais\n"
+                            f"- ✏️ **Personalizável**: Edite nome, descrição\n"
                             f"- 🗂️ **Organize suas ideias**: Crie posts privados\n"
-                            f"- 🔧 **Controle total**: Gerencie todas as mensagens\n"
-                            f"- 🌟 **Único**: Este é seu ÚNICO fórum nesta categoria!\n\n"
+                            f"- 🔧 **Controle total**: Gerencie mensagens\n"
+                            f"- 🌟 **Único**: Seu ÚNICO fórum nesta categoria!\n\n"
                             f"**Aproveite seu espaço pessoal!** 🎊"
                         ),
                     )
                     logger.debug("Thread de boas-vindas criada")
-                except (discord.HTTPException, discord.Forbidden, discord.InvalidArgument) as thread_error:
+                except (
+                    discord.HTTPException,
+                    discord.Forbidden,
+                    discord.InvalidArgument,
+                ) as thread_error:
                     logger.warning(
                         "Não foi possível criar thread de boas-vindas: %s",
                         str(thread_error),
@@ -913,9 +961,10 @@ class ChannelController:
                 )
                 return False
 
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "Erro ao criar fórum único para %s", member.display_name
+                "Erro ao criar fórum único para %s",
+                member.display_name,
             )
             return False
         else:
@@ -926,7 +975,10 @@ class ChannelController:
     # ---------------------------------------------------------------
 
     async def _remove_temp_channel_from_database(
-        self, channel_id: int, channel_name: str = "", category_name: str = ""
+        self,
+        channel_id: int,
+        channel_name: str = "",
+        category_name: str = "",
     ) -> bool:
         """Marca canal temporário como inativo no banco de dados."""
         import aiosqlite
@@ -945,7 +997,8 @@ class ChannelController:
                 await db.commit()
 
             logger.info(
-                "Canal temporário marcado como inativo | Nome: '%s' | Categoria: '%s' | ID: %s",
+                "Canal temporário marcado como inativo | Nome: '%s' | "
+                "Categoria: '%s' | ID: %s",
                 channel_name or "Desconhecido",
                 category_name or "Desconhecida",
                 channel_id,
@@ -982,7 +1035,7 @@ class ChannelController:
                 temp_channels = await cursor.fetchall()
 
                 logger.info(
-                    f"Encontradas {len(temp_channels)} salas temporárias ativas"
+                    f"Encontradas {len(temp_channels)} salas temporárias ativas",
                 )
 
                 # Remove cada sala
@@ -996,10 +1049,11 @@ class ChannelController:
                                 else "Sem categoria"
                             )
                             await channel.delete(
-                                reason="Limpeza automática - Bot desconectando"
+                                reason="Limpeza automática - Bot desconectando",
                             )
                             logger.info(
-                                f"Sala removida: '{channel_name}' (Categoria: '{category_name}')"
+                                f"Sala removida: '{channel_name}' "
+                                f"(Categoria: '{category_name}')",
                             )
                             removed_count += 1
 
@@ -1010,7 +1064,8 @@ class ChannelController:
                             )
                         else:
                             await self._remove_temp_channel_from_database(
-                                channel_id=channel_id, channel_name=channel_name
+                                channel_id=channel_id,
+                                channel_name=channel_name,
                             )
 
                     except Exception:

@@ -71,6 +71,8 @@ select = [
 ignore = [
     "FBT003",   # boolean args (APIs do Discord.py)
     "C901",     # complex function (tratamento de erros)
+    "COM812",   # missing-trailing-comma (conflita com formatter)
+    "E501",     # line too long (gerado automaticamente pelo Black)
 ]
 
 [tool.ruff.lint.per-file-ignores]

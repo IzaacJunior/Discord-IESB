@@ -3,13 +3,14 @@
 💡 Boa Prática: Define contratos para persistência sem dependências externas!
 """
 
-from __future__ import annotations 
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from domain.entities import Channel, TextChannel, VoiceChannel
+
 
 class ChannelRepository(ABC):
     """

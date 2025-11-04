@@ -11,12 +11,15 @@
 """
 
 import logging
+
 import discord
 from discord.ext import commands
 
-from infrastructure.repositories import DiscordChannelRepository, SQLiteCategoryRepository
+from infrastructure.repositories import (
+    DiscordChannelRepository,
+    SQLiteCategoryRepository,
+)
 from presentation.controllers.channel_controller import ChannelController
-
 
 # 📝 Logger para rastreamento de eventos
 logger = logging.getLogger(__name__)
@@ -25,7 +28,7 @@ logger = logging.getLogger(__name__)
 class Eventos(commands.Cog):
     """
     🎧 Gerenciador de Eventos do Discord
-    
+
     💡 Boa Prática: Usa Cog para organizar eventos relacionados
     🏗️ Arquitetura: Camada de entrada que delega para Controllers
     """
@@ -40,7 +43,7 @@ class Eventos(commands.Cog):
         💡 Boa Prática: Injeção de dependências no construtor
         """
         self.bot = bot
-        
+
         # 🏗️ Injeção de dependência correta - Clean Architecture!
         # 💡 Boa Prática: Repository de banco separado do repository Discord
         category_db_repository = SQLiteCategoryRepository()
@@ -87,7 +90,7 @@ class Eventos(commands.Cog):
         1. Verifica se há categoria configurada para fóruns únicos
         2. Se SIM: cria fórum único na categoria configurada
         3. Se NÃO: ignora criação (sistema desativado)
-        
+
         🏠 Fluxo: Discord Event → Controller → Repository → Discord API
 
         Funcionalidades do fórum criado:
@@ -113,61 +116,60 @@ class Eventos(commands.Cog):
         # 🔍 STEP 1: Busca no banco se existe categoria configurada (apenas UMA por guilda)
         try:
             guild = member.guild
-            
+
             # 💾 Consulta banco de dados para buscar categoria configurada
             configured_category = await self.channel_controller.channel_repository.get_unique_channel_category(
                 guild_id=guild.id
             )
-            
+
             # 🎯 STEP 2: Se NÃO há categoria configurada, ignora criação
             if not configured_category:
                 logger.info(
                     "⏭️ Nenhuma categoria configurada para fóruns únicos | servidor=%s",
-                    guild.name
+                    guild.name,
                 )
                 return
-            
+
             # 🔍 Busca a categoria no Discord
             category = guild.get_channel(configured_category["category_id"])
-            
+
             if not category:
                 logger.warning(
                     "⚠️ Categoria configurada não encontrada no Discord | category_id=%s | servidor=%s",
                     configured_category["category_id"],
-                    guild.name
+                    guild.name,
                 )
                 return
-            
+
             # 🏠 STEP 3: Cria fórum único na categoria configurada
             logger.info(
                 "🎯 Categoria configurada encontrada: '%s' | Criando fórum único",
-                configured_category["category_name"]
+                configured_category["category_name"],
             )
-            
+
             success = await self.channel_controller.handle_create_unique_member_channel(
-                member=member,
-                category_id=category.id
+                member=member, category_id=category.id
             )
-            
+
             # 💬 Log do resultado
             if success:
                 logger.info(
                     "✅ Fórum único criado | member=%s | categoria=%s",
                     member.display_name,
-                    category.name
+                    category.name,
                 )
             else:
                 logger.info(
                     "⏭️ Fórum não criado (pode já existir) | member=%s | categoria=%s",
                     member.display_name,
-                    category.name
+                    category.name,
                 )
-                
+
         except Exception as e:
             logger.exception(
                 "❌ Erro ao processar entrada de membro %s: %s",
                 member.display_name,
-                str(e)
+                str(e),
             )
 
 

@@ -123,7 +123,8 @@ class DiscordChannelRepository(ChannelRepository):
         # 💡 Log das permissões aplicadas
         if overwrites:
             logger.debug(
-                "🔒 Canal criado com %d permissões customizadas", len(overwrites)
+                "🔒 Canal criado com %d permissões customizadas",
+                len(overwrites),
             )
 
         # Converte para entidade do domain
@@ -279,7 +280,9 @@ class DiscordChannelRepository(ChannelRepository):
         existing_role = discord.utils.get(guild.roles, name=role_name)
         if existing_role:
             logger.warning(
-                "⚠️ Role '%s' já existe no servidor (ID: %s)", role_name, guild_id
+                "⚠️ Role '%s' já existe no servidor (ID: %s)",
+                role_name,
+                guild_id,
             )
             role = existing_role
         else:
@@ -290,7 +293,9 @@ class DiscordChannelRepository(ChannelRepository):
                 color=discord.Color.blue(),  # Cor azul para fóruns
             )
             logger.info(
-                "✅ Role criado para fórum | role=%s | id=%s", role_name, role.id
+                "✅ Role criado para fórum | role=%s | id=%s",
+                role_name,
+                role.id,
             )
 
         # 🏗️ Cria o canal de fórum no Discord com PERMISSÕES especiais
@@ -419,7 +424,7 @@ class DiscordChannelRepository(ChannelRepository):
                         if discord_channel.category
                         else None,
                         topic=discord_channel.topic,
-                    )
+                    ),
                 )
             elif isinstance(discord_channel, discord.VoiceChannel):
                 channels.append(
@@ -432,7 +437,7 @@ class DiscordChannelRepository(ChannelRepository):
                         else None,
                         user_limit=discord_channel.user_limit,
                         bitrate=discord_channel.bitrate,
-                    )
+                    ),
                 )
 
         return channels
@@ -448,7 +453,9 @@ class DiscordChannelRepository(ChannelRepository):
         💡 Boa Prática: Usa Discord.py para verificar duplicatas!
         """
         logger.debug(
-            "🔍 Verificando se canal '%s' existe no servidor %s", name, guild_id
+            "🔍 Verificando se canal '%s' existe no servidor %s",
+            name,
+            guild_id,
         )
 
         guild = self.bot.get_guild(guild_id)
@@ -492,7 +499,9 @@ class DiscordChannelRepository(ChannelRepository):
                 and discord_channel.name.lower() == name.lower()
             ):
                 logger.debug(
-                    "✅ Canal '%s' encontrado: ID %s", name, discord_channel.id
+                    "✅ Canal '%s' encontrado: ID %s",
+                    name,
+                    discord_channel.id,
                 )
 
                 # Converte para entidade do domain
@@ -565,7 +574,9 @@ class DiscordChannelRepository(ChannelRepository):
         """
         # 🔗 Delega para o repository de banco de dados
         return await self.category_db.mark_category_as_temp_generator(
-            category_id, category_name, guild_id
+            category_id,
+            category_name,
+            guild_id,
         )
 
     async def unmark_category_as_temp_generator(
@@ -587,7 +598,8 @@ class DiscordChannelRepository(ChannelRepository):
         """
         # � Delega para o repository de banco de dados
         return await self.category_db.unmark_category_as_temp_generator(
-            category_id, guild_id
+            category_id,
+            guild_id,
         )
 
     async def get_temp_channels_by_category(
@@ -609,7 +621,8 @@ class DiscordChannelRepository(ChannelRepository):
         """
         # 🔗 Delega para o repository de banco de dados
         return await self.category_db.get_temp_channels_by_category(
-            category_id, guild_id
+            category_id,
+            guild_id,
         )
 
     async def is_temporary_channel(
@@ -695,7 +708,9 @@ class DiscordChannelRepository(ChannelRepository):
         """
         # 🔗 Delega para o repository de banco de dados
         return await self.category_db.mark_category_as_unique_generator(
-            category_id, category_name, guild_id
+            category_id,
+            category_name,
+            guild_id,
         )
 
     async def unmark_category_as_unique_generator(
@@ -737,7 +752,9 @@ class DiscordChannelRepository(ChannelRepository):
         """
         # 🔗 Delega para o repository de banco de dados
         return await self.category_db.member_has_unique_channel_in_category(
-            member_id, category_id, guild_id
+            member_id,
+            category_id,
+            guild_id,
         )
 
     async def register_member_unique_channel(
@@ -765,7 +782,11 @@ class DiscordChannelRepository(ChannelRepository):
         """
         # � Delega para o repository de banco de dados
         return await self.category_db.register_member_unique_channel(
-            member_id, channel_id, channel_name, guild_id, category_id
+            member_id,
+            channel_id,
+            channel_name,
+            guild_id,
+            category_id,
         )
 
     async def get_member_unique_channels(

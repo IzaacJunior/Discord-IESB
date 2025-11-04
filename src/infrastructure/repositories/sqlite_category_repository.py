@@ -145,7 +145,8 @@ class SQLiteCategoryRepository(CategoryDatabaseRepository):
 
                 if cursor.rowcount > 0:
                     logger.info(
-                        "✅ Categoria ID %s desmarcada com sucesso", category_id
+                        "✅ Categoria ID %s desmarcada com sucesso",
+                        category_id,
                     )
                     return True
 
@@ -168,7 +169,8 @@ class SQLiteCategoryRepository(CategoryDatabaseRepository):
         """
         try:
             logger.info(
-                "🔍 Buscando canais temporários da categoria ID %s", category_id
+                "🔍 Buscando canais temporários da categoria ID %s",
+                category_id,
             )
 
             async with aiosqlite.connect(self.db_path) as db:
@@ -248,7 +250,8 @@ class SQLiteCategoryRepository(CategoryDatabaseRepository):
         """
         try:
             logger.debug(
-                "🔍 Verificando se categoria %s gera fóruns únicos", category_id
+                "🔍 Verificando se categoria %s gera fóruns únicos",
+                category_id,
             )
 
             async with aiosqlite.connect(self.db_path) as db:
@@ -411,7 +414,8 @@ class SQLiteCategoryRepository(CategoryDatabaseRepository):
 
                 if cursor.rowcount > 0:
                     logger.info(
-                        "✅ Categoria ID %s desmarcada com sucesso", category_id
+                        "✅ Categoria ID %s desmarcada com sucesso",
+                        category_id,
                     )
                     return True
 
@@ -464,7 +468,9 @@ class SQLiteCategoryRepository(CategoryDatabaseRepository):
                     return True
 
                 logger.debug(
-                    "❌ Membro %s não tem canal na categoria %s", member_id, category_id
+                    "❌ Membro %s não tem canal na categoria %s",
+                    member_id,
+                    category_id,
                 )
                 return False
 
@@ -509,7 +515,6 @@ class SQLiteCategoryRepository(CategoryDatabaseRepository):
                         channel_name,
                         member_id,
                     )
-                    return True
 
                 except aiosqlite.IntegrityError:
                     # 🔒 UNIQUE constraint violado: membro já tem canal
@@ -523,6 +528,8 @@ class SQLiteCategoryRepository(CategoryDatabaseRepository):
         except Exception:
             logger.exception("❌ Erro ao registrar canal único")
             return False
+        else:
+            return True
 
     async def get_member_unique_channels(
         self,
@@ -566,7 +573,9 @@ class SQLiteCategoryRepository(CategoryDatabaseRepository):
                 ]
 
                 logger.debug(
-                    "✅ Encontrados %d canais para membro %s", len(channels), member_id
+                    "✅ Encontrados %d canais para membro %s",
+                    len(channels),
+                    member_id,
                 )
                 return channels
 

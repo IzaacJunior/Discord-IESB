@@ -6,7 +6,7 @@
 from __future__ import annotations  # 🆕 Python 3.13 - Forward references
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Any
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from domain.entities import ChannelType
@@ -16,38 +16,41 @@ if TYPE_CHECKING:
 class CreateChannelDTO:
     """
     📝 DTO para criação de canais
-    
+
     💡 Boa Prática: Usa slots=True para economia de memória
     e frozen=True para imutabilidade e thread-safety
     """
+
     name: str
-    channel_type: "ChannelType"
+    channel_type: ChannelType
     guild_id: int
     category_id: int | None = None
     member_id: int | None = None
     is_temporary: bool = False  # 🆕 Para salas temporárias
-    
+
     # 🔊 Campos específicos para canais de voz
     user_limit: int = 0  # 💖 Limite de usuários (0 = ilimitado)
     bitrate: int = 64000  # 💖 Taxa de bits padrão
-    overwrites: dict[Any, Any] | None = None  # 🔒 Permissões customizadas (roles/membros)
-    
+    overwrites: dict[Any, Any] | None = (
+        None  # 🔒 Permissões customizadas (roles/membros)
+    )
+
     # 💬 Campos específicos para canais de texto
     topic: str | None = None  # 💖 Tópico do canal
-    
+
     def __post_init__(self) -> None:
         """
         ✅ Validação automática dos dados
-        
+
         💡 Boa Prática: Validação no DTO previne erros
         em camadas mais profundas da aplicação
         """
         if not self.name or len(self.name.strip()) == 0:
             raise ValueError("Nome do canal não pode estar vazio")
-        
+
         if len(self.name) > 100:
             raise ValueError("Nome do canal muito longo (máximo 100 caracteres)")
-        
+
         if self.guild_id <= 0:
             raise ValueError("Guild ID deve ser positivo")
 

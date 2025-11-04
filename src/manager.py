@@ -11,7 +11,7 @@ from discord.ext import commands
 from presentation.controllers import ChannelController
 
 logger = logging.getLogger(__name__)
-audit = logging.getLogger('audit')
+audit = logging.getLogger("audit")
 
 
 class BotErrorHandler:
@@ -67,7 +67,11 @@ class BotErrorHandler:
         if isinstance(error, errors.MissingPermissions):
             audit.warning(
                 f"{__name__} | Permissão ausente para comando",
-                extra={'command': full_command, 'user_id': ctx.author.id, 'module': 'manager.BotErrorHandler'}
+                extra={
+                    "command": full_command,
+                    "user_id": ctx.author.id,
+                    "module": "manager.BotErrorHandler",
+                },
             )
             await ctx.send(
                 f"❌ {ctx.author.mention}, você não tem permissão para usar este comando!",
@@ -91,7 +95,7 @@ class BotErrorHandler:
         elif isinstance(error, Forbidden):
             audit.warning(
                 f"{__name__} | Bot sem permissões para comando",
-                extra={'command': full_command, 'module': 'manager.BotErrorHandler'}
+                extra={"command": full_command, "module": "manager.BotErrorHandler"},
             )
             await ctx.send(
                 f"❌ {ctx.author.mention}, o bot não tem permissões suficientes!",
@@ -101,7 +105,7 @@ class BotErrorHandler:
         else:
             audit.error(
                 f"{__name__} | Erro inesperado no comando: {full_command}",
-                extra={'command': full_command, 'error_type': type(error).__name__}
+                extra={"command": full_command, "error_type": type(error).__name__},
             )
             await ctx.send(
                 f"❌ {ctx.author.mention}, ocorreu um erro inesperado! Tente novamente.",
@@ -125,7 +129,7 @@ class BotErrorHandler:
         if isinstance(error, app_commands.MissingPermissions):
             audit.warning(
                 f"{__name__} | Permissão ausente para slash command",
-                extra={'command': command_name, 'module': 'manager.BotErrorHandler'}
+                extra={"command": command_name, "module": "manager.BotErrorHandler"},
             )
             await interaction.response.send_message(
                 "❌ Você não tem permissão para usar este comando.", ephemeral=True
@@ -141,7 +145,7 @@ class BotErrorHandler:
         else:
             audit.error(
                 f"{__name__} | Erro inesperado no slash command: {command_name}",
-                extra={'command': command_name, 'error_type': type(error).__name__}
+                extra={"command": command_name, "error_type": type(error).__name__},
             )
             await interaction.response.send_message(
                 "❌ Ocorreu um erro inesperado ao executar o comando.", ephemeral=True
@@ -178,7 +182,6 @@ class CleanArchitectureManager:
         async def on_ready() -> None:
             """✅ Bot conectado e configurado"""
 
-
             # 🎮 Define status personalizado
             activity = discord.Activity(
                 type=discord.ActivityType.watching, name="Sistema NÃO oficial do IESB"
@@ -192,7 +195,10 @@ class CleanArchitectureManager:
             except Exception as e:
                 audit.error(
                     f"{__name__} | Falha ao sincronizar comandos slash",
-                    extra={'error_type': type(e).__name__, 'module': 'manager.on_ready'}
+                    extra={
+                        "error_type": type(e).__name__,
+                        "module": "manager.on_ready",
+                    },
                 )
             audit.info(
                 f"{__name__} | 🤖 Bot conectado: %s (ID: %s) | Servidores: %d",
@@ -201,6 +207,7 @@ class CleanArchitectureManager:
                 len(self.bot.guilds),
             )
             logger.info("✅ Bot pronto e operando!")
+
         @self.bot.event
         async def on_message(message: discord.Message) -> None:
             """
@@ -217,7 +224,9 @@ class CleanArchitectureManager:
                 try:
                     await message.delete()
                 except discord.Forbidden:
-                    audit.warning(f"{__name__} | Sem permissão para deletar mensagem de comando")
+                    audit.warning(
+                        f"{__name__} | Sem permissão para deletar mensagem de comando"
+                    )
                 except discord.NotFound:
                     pass
 
@@ -235,7 +244,10 @@ def create_manager(bot: commands.Bot) -> CleanArchitectureManager:
     Returns:
         Manager configurado apenas para coordenação
     """
-    from infrastructure.repositories import DiscordChannelRepository, SQLiteCategoryRepository
+    from infrastructure.repositories import (
+        DiscordChannelRepository,
+        SQLiteCategoryRepository,
+    )
 
     # 🔧 Criação das dependências (Clean Architecture com injeção de dependência!)
     # 💡 Boa Prática: Repository de banco de dados separado do repository Discord
@@ -245,4 +257,3 @@ def create_manager(bot: commands.Bot) -> CleanArchitectureManager:
 
     # 🎯 Manager puro (sem comandos)
     return CleanArchitectureManager(bot, channel_controller)
-
