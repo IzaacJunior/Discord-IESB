@@ -46,13 +46,16 @@ class CreateChannelDTO:
         em camadas mais profundas da aplicação
         """
         if not self.name or len(self.name.strip()) == 0:
-            raise ValueError("Nome do canal não pode estar vazio")
+            msg = "Nome do canal não pode estar vazio"
+            raise ValueError(msg)
 
         if len(self.name) > 100:
-            raise ValueError("Nome do canal muito longo (máximo 100 caracteres)")
+            msg = "Nome do canal muito longo (máximo 100 caracteres)"
+            raise ValueError(msg)
 
         if self.guild_id <= 0:
-            raise ValueError("Guild ID deve ser positivo")
+            msg = "Guild ID deve ser positivo"
+            raise ValueError(msg)
 
 
 @dataclass(frozen=True, slots=True)  # 🆕 Performance otimizada

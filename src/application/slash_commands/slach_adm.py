@@ -54,7 +54,6 @@ class SlachModer(commands.Cog):
             "Desconectando o bot... Até logo!", ephemeral=True
         )
         await self.bot.close()
-        print("Bot Desconectado!")
 
 
 async def setup(bot: commands.Bot):

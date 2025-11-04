@@ -61,11 +61,9 @@ class AnalyticsSubscriber:
             )
 
             # 💡 Aqui você integraria com serviços reais:
-            # await self.google_analytics.track_event(tracked_event)
-            # await self.mixpanel.track(user_id, "Room Created", tracked_event)
 
-        except Exception as e:
-            logger.error("❌ Erro ao rastrear analytics: %s", str(e), exc_info=True)
+        except (ValueError, KeyError, AttributeError):
+            logger.exception("❌ Erro ao rastrear analytics")
             # 🛡️ Não propaga erro - falha isolada
 
     async def on_temp_room_deleted(self, event: DomainEvent) -> None:
@@ -94,8 +92,8 @@ class AnalyticsSubscriber:
                 data.get("duration_seconds"),
             )
 
-        except Exception as e:
-            logger.error("❌ Erro ao rastrear analytics de exclusão: %s", str(e))
+        except (ValueError, KeyError, AttributeError):
+            logger.exception("❌ Erro ao rastrear analytics de exclusão")
 
     async def on_command_executed(self, event: DomainEvent) -> None:
         """
@@ -124,5 +122,5 @@ class AnalyticsSubscriber:
                 data.get("user_id"),
             )
 
-        except Exception as e:
-            logger.error("❌ Erro ao rastrear comando: %s", str(e))
+        except (ValueError, KeyError, AttributeError):
+            logger.exception("❌ Erro ao rastrear comando")

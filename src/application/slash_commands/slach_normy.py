@@ -21,7 +21,6 @@ class SlachNormy(commands.Cog):
             await interaction.followup.send(
                 f"Seu nome foi alterado para: {nome}", ephemeral=True
             )
-            print(f"{interaction.user.name} mudou o nome para {nome}")
         except discord.Forbidden:
             await interaction.followup.send(
                 "Não consegui alterar seu nome. Verifique minhas permissões.",

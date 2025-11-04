@@ -47,11 +47,11 @@ class ChannelController:
         topic: str | None = None,
     ) -> None:
         """Cria canal de texto via comando slash."""
-        logger.info("?? Processando criação de canal de texto: %s", name)
+        logger.info("💬 Processando criação de canal de texto: %s", name)
 
         if not name or not name.strip():
             await interaction.response.send_message(
-                "? Nome do canal não pode estar vazio!",
+                "❌ Nome do canal não pode estar vazio!",
                 ephemeral=True,
             )
             return
@@ -70,25 +70,25 @@ class ChannelController:
             match result.created:
                 case True:
                     await interaction.response.send_message(
-                        f"? Canal de texto **{result.name}** criado com sucesso!",
+                        f"✅ Canal de texto **{result.name}** criado com sucesso!",
                         ephemeral=True,
                     )
                 case False:
                     if result.id > 0:
                         await interaction.response.send_message(
-                            f"?? Canal **{result.name}** já existe! Não criado duplicata.",
+                            "⚠️ Canal já existe! Não criado duplicata.",
                             ephemeral=True,
                         )
                     else:
                         await interaction.response.send_message(
-                            f"? Falha ao criar canal **{name}**. Tente novamente.",
+                            f"❌ Falha ao criar canal **{name}**. Tente novamente.",
                             ephemeral=True,
                         )
 
         except Exception:
-            logger.exception("? Erro inesperado ao criar canal: %s", name)
+            logger.exception("❌ Erro inesperado ao criar canal: %s", name)
             await interaction.response.send_message(
-                "? Erro interno do servidor. Tente novamente em alguns minutos.",
+                "❌ Erro interno do servidor. Tente novamente em alguns minutos.",
                 ephemeral=True,
             )
 
@@ -112,13 +112,13 @@ class ChannelController:
         match user_limit:
             case x if x < 0:
                 await interaction.response.send_message(
-                    "? Limite de usuários não pode ser negativo!",
+                    "❌ Limite de usuários não pode ser negativo!",
                     ephemeral=True,
                 )
                 return
             case x if x > 99:
                 await interaction.response.send_message(
-                    "? Limite máximo é 99 usuários!",
+                    "❌ Limite máximo é 99 usuários!",
                     ephemeral=True,
                 )
                 return
@@ -136,18 +136,18 @@ class ChannelController:
             match result.created:
                 case True:
                     await interaction.response.send_message(
-                        f"? Canal de voz **{result.name}** criado com sucesso!",
+                        f"✅ Canal de voz **{result.name}** criado com sucesso!",
                         ephemeral=True,
                     )
                 case False:
                     if result.id > 0:
                         await interaction.response.send_message(
-                            "?? Canal já existe! Não criado duplicata.",
+                            "⚠️ Canal já existe! Não criado duplicata.",
                             ephemeral=True,
                         )
                     else:
                         await interaction.response.send_message(
-                            f"? Falha ao criar canal **{name}**. Tente novamente.",
+                            f"❌ Falha ao criar canal **{name}**. Tente novamente.",
                             ephemeral=True,
                         )
 
@@ -185,7 +185,7 @@ class ChannelController:
             bool: True se fórum foi criado com sucesso
         """
         try:
-            logger.info("?? Criando fórum privado para %s", member.display_name)
+            logger.info("🏠 Criando fórum privado para %s", member.display_name)
 
             # Gera nome do fórum baseado no membro
             forum_name = f"{member.display_name.lower()}"
@@ -198,7 +198,7 @@ class ChannelController:
                 category_id=category_id,
             )
 
-            # ?? Envia mensagem de boas-vindas no fórum
+            # 📨 Envia mensagem de boas-vindas no fórum
             try:
                 # Cria thread inicial com instruções
                 welcome_thread = await forum_channel.create_thread(
@@ -207,13 +207,11 @@ class ChannelController:
                         f"## Olá, {member.mention}!\n\n"
                         f"Este é o seu **fórum privado pessoal**!\n\n"
                         f"### O que você pode fazer aqui:\n"
-                        f"-  **Criar threads privadas**: Clique em 'Nova Postagem'\n"
-                        f"   para criar tópicos privados\n"
-                        f"-  **Editar o nome**: Clique com botão direito em 'Editar Canal'\n"
-                        f"-  **Gerenciar mensagens**: Delete ou edite mensagens\n"
-                        f"-  **Privacidade total**: Apenas você pode ver este canal\n"
-                        f"   e seus posts!\n"
-                        f"-  **Personalizar**: Mude nome, descrição, tags e tudo mais!\n\n"
+                        f"-  **Criar threads privadas**: Clique em 'Nova Postagem' para criar tópicos privados\n"
+                        f"-  **Editar o nome**: Clique com botão direito no canal 'Editar Canal'\n"
+                        f"-  **Gerenciar mensagens**: Delete ou edite qualquer mensagem\n"
+                        f"-  **Privacidade total**: Apenas você pode ver este canal e seus posts!\n"
+                        f"-  **Personalizar**: Mude o nome, descrição, tags e tudo mais!\n\n"
                         f"### Dicas:\n"
                         f"- Use tags para organizar seus tópicos\n"
                         f"- Threads são arquivadas após 7 dias de inatividade\n"
@@ -224,7 +222,7 @@ class ChannelController:
                 )
 
                 logger.info(
-                    "? Thread de boas-vindas criada | thread=%s",
+                    "✅ Thread de boas-vindas criada | thread=%s",
                     welcome_thread.thread.name,
                 )
 
@@ -234,7 +232,7 @@ class ChannelController:
                 discord.InvalidArgument,
             ) as thread_error:
                 logger.warning(
-                    "?? Não foi possível criar thread de boas-vindas: %s",
+                    "⚠️ Não foi possível criar thread de boas-vindas: %s",
                     str(thread_error),
                 )
 
@@ -424,7 +422,7 @@ class ChannelController:
             )
             return False
 
-        # Categoria é geradora ? Cria sala temporária
+        # Categoria é geradora → Cria sala temporária
         logger.info("ACEITO: Criando sala temporária para %s", member.display_name)
         return await self._create_temporary_room(member, after)
 
@@ -474,7 +472,7 @@ class ChannelController:
             )
 
             logger.info(
-                "? Criando sala temporária '%s' para %s (clone completo)",
+                "🔊 Criando sala temporária '%s' para %s (clone completo)",
                 create_dto.name,
                 member.display_name,
             )
@@ -489,7 +487,7 @@ class ChannelController:
                 new_channel = member.guild.get_channel(result.id)
 
                 if new_channel and isinstance(new_channel, discord.VoiceChannel):
-                    # ? Verifica se sala foi REALMENTE criada nesta chamada
+                    # ✅ Verifica se sala foi REALMENTE criada nesta chamada
                     if result.created:
                         try:
                             # Cria embed informativa
@@ -592,7 +590,7 @@ class ChannelController:
             )
             return False
 
-        # Sala está vazia ? Aguarda 3s antes de deletar
+        # Sala está vazia → Aguarda 3s antes de deletar
         logger.info(
             "Sala temporária '%s' ficou vazia. Aguardando 3s antes de deletar...",
             before.channel.name,
@@ -616,7 +614,7 @@ class ChannelController:
                 )
                 return True
 
-            # Confirma vazio ? Deleta
+            # Confirma vazio → Deleta
             logger.info("Confirmado vazio após 3s. Deletando: '%s'", channel_check.name)
 
             # Marca no banco como inativo
@@ -937,10 +935,10 @@ class ChannelController:
                             f"Este é o seu **fórum privado único**! 🎉\n\n"
                             f"### Características especiais:\n"
                             f"- 🔒 **Totalmente privado**: Apenas você pode ver!\n"
-                            f"- ✏️ **Personalizável**: Edite nome, descrição\n"
+                            f"- ✏️ **Personalizável**: Edite nome, descrição e tudo mais\n"
                             f"- 🗂️ **Organize suas ideias**: Crie posts privados\n"
-                            f"- 🔧 **Controle total**: Gerencie mensagens\n"
-                            f"- 🌟 **Único**: Seu ÚNICO fórum nesta categoria!\n\n"
+                            f"- 🔧 **Controle total**: Gerencie todas as mensagens\n"
+                            f"- 🌟 **Único**: Este é seu ÚNICO fórum nesta categoria!\n\n"
                             f"**Aproveite seu espaço pessoal!** 🎊"
                         ),
                     )

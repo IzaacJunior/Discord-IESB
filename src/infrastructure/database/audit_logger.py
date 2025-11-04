@@ -4,13 +4,14 @@
 🚀 Python 3.13: Type hints modernos e async/await otimizado
 """
 
+import contextlib
 import json
 import logging
 import sqlite3
 import threading
 from datetime import datetime
 from pathlib import Path
-from queue import Queue
+from queue import Empty, Queue
 from typing import Any
 
 import colorlog
@@ -68,16 +69,17 @@ class DatabaseLogHandler(logging.Handler):
         self.worker_thread.start()
 
         # 🏗️ Garante que o banco e tabelas existem
-        self._ensure_database_exists()
+        self._initialize_database()
 
-    def _ensure_database_exists(self) -> None:
+    def _initialize_database(self) -> None:
         """
-        🔨 Cria o banco de auditoria e tabelas se não existirem.
+        �️ Inicializa o banco de dados de auditoria.
 
-        💡 Boa Prática: Idempotente - pode ser chamado múltiplas vezes!
-        🔒 Usa CREATE IF NOT EXISTS para segurança
+        💡 Boa Prática: Usa contextlib.suppress para ignorar erros de forma explícita
+        🛡️ Segurança: Falhas não devem quebrar a aplicação principal
         """
-        try:
+        # � ALTERNATIVA 1: Usar contextlib.suppress para suprimir erros esperados
+        with contextlib.suppress(sqlite3.Error, OSError, IOError):
             # Cria diretório se não existir
             AUDIT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -108,10 +110,6 @@ class DatabaseLogHandler(logging.Handler):
                     """)
                     conn.commit()
 
-        except Exception as e:
-            # 🚨 Não podemos usar logging aqui (loop infinito!)
-            print(f"❌ Erro ao criar banco de auditoria: {e}")
-
     def emit(self, record: logging.LogRecord) -> None:
         """
         📝 Adiciona log na fila para ser salvo no banco.
@@ -122,7 +120,9 @@ class DatabaseLogHandler(logging.Handler):
         Args:
             record: Registro de log do Python logging
         """
-        try:
+        # 💡 Padronização: Usa contextlib.suppress para tratar erros
+        # Se qualquer erro ocorrer, handleError() será chamado automaticamente
+        with contextlib.suppress(Exception):
             # 📊 Extrai dados extras se existirem
             extra_data = {}
             for key, value in record.__dict__.items():
@@ -167,10 +167,10 @@ class DatabaseLogHandler(logging.Handler):
 
             # 📦 Adiciona na fila (não bloqueia!)
             self.log_queue.put(log_data)
+            return  # Sucesso - retorna normalmente
 
-        except Exception:
-            # 🚨 Evita exceções no logging causarem problemas
-            self.handleError(record)
+        # Se chegou aqui, houve erro - usa handleError() do logging
+        self.handleError(record)
 
     def _worker(self) -> None:
         """
@@ -182,18 +182,20 @@ class DatabaseLogHandler(logging.Handler):
         batch: list[dict[str, Any]] = []
 
         while True:
+            # 💡 Padronização: Captura Empty com try-except específico
+            # contextlib.suppress não funciona bem aqui pois precisamos do fluxo
             try:
                 # 📦 Pega log da fila (bloqueia até ter um disponível)
                 log_data = self.log_queue.get(timeout=self.flush_interval)
                 batch.append(log_data)
 
-                # 💾 Salva batch quando atingir o tamanho ou timeout
+                # 💾 Salva batch quando atingir o tamanho
                 if len(batch) >= self.batch_size:
                     self._save_batch(batch)
                     batch = []
 
-            except Exception:
-                # Timeout - força flush do batch atual
+            except Empty:
+                # ✅ Timeout esperado - força flush do batch atual
                 if batch:
                     self._save_batch(batch)
                     batch = []
@@ -211,37 +213,37 @@ class DatabaseLogHandler(logging.Handler):
         if not batch:
             return
 
-        try:
-            with sqlite3.connect(AUDIT_DB_PATH) as conn:
-                cursor = conn.cursor()
+        # 💡 Padronização: Usa contextlib.suppress para suprimir erros de DB
+        # Se falhar ao salvar, descarta o batch para não travar a thread
+        with (
+            contextlib.suppress(sqlite3.Error, OSError),
+            sqlite3.connect(AUDIT_DB_PATH) as conn,
+        ):
+            cursor = conn.cursor()
 
-                # 📝 Batch insert
-                cursor.executemany(
-                    """
-                    INSERT INTO application_logs 
-                    (timestamp, level, logger_name, message, module, function, line_number, extra_data)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    [
-                        (
-                            log["timestamp"],
-                            log["level"],
-                            log["logger_name"],
-                            log["message"],
-                            log["module"],
-                            log["function"],
-                            log["line_number"],
-                            log["extra_data"],
-                        )
-                        for log in batch
-                    ],
-                )
+            # 📝 Batch insert
+            cursor.executemany(
+                """
+                INSERT INTO application_logs
+                (timestamp, level, logger_name, message, module, function, line_number, extra_data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        log["timestamp"],
+                        log["level"],
+                        log["logger_name"],
+                        log["message"],
+                        log["module"],
+                        log["function"],
+                        log["line_number"],
+                        log["extra_data"],
+                    )
+                    for log in batch
+                ],
+            )
 
-                conn.commit()
-
-        except Exception as e:
-            # 🚨 Não podemos usar logging aqui (loop infinito!)
-            print(f"❌ Erro ao salvar batch de logs: {e}")
+            conn.commit()
 
     def flush(self) -> None:
         """
@@ -252,9 +254,12 @@ class DatabaseLogHandler(logging.Handler):
         # Processa todos os logs restantes na fila
         remaining_logs = []
         while not self.log_queue.empty():
+            # 💡 Padronização: Captura Empty com try-except específico
+            # (contextlib.suppress não é ideal aqui pelo fluxo de controle)
             try:
                 remaining_logs.append(self.log_queue.get_nowait())
-            except Exception:
+            except Empty:
+                # ✅ Queue está vazia - comportamento esperado
                 break
 
         if remaining_logs:

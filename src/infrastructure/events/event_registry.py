@@ -88,7 +88,8 @@ def setup_event_subscribers(
     # ============================================
     # 📊 RESUMO
     # ============================================
-    total_handlers = sum(len(handlers) for handlers in event_bus._handlers.values())
+    # 💡 Boa Prática: Usar método público ao invés de acessar atributo privado
+    total_handlers = event_bus.get_total_handlers()
 
     logger.info(
         "🎉 Setup concluído: %d subscriber(s), %d handler(s) registrado(s)",
@@ -127,20 +128,20 @@ def setup_additional_subscribers(event_bus: EventBus) -> None:
     """
     # 🔒 Audit Subscriber
     from infrastructure.events.subscribers import AuditSubscriber
-    
+
     audit_subscriber = AuditSubscriber()
     event_bus.subscribe("temp_room_created", audit_subscriber.on_temp_room_created)
     event_bus.subscribe("temp_room_deleted", audit_subscriber.on_temp_room_deleted)
     event_bus.subscribe("member_banned", audit_subscriber.on_member_banned)
-    
+
     logger.info("✅ Audit Subscriber registrado")
-    
+
     # 💾 Cache Subscriber
     from infrastructure.events.subscribers import CacheSubscriber
-    
+
     cache_subscriber = CacheSubscriber(redis_client)
     event_bus.subscribe("temp_room_created", cache_subscriber.on_temp_room_created)
     event_bus.subscribe("channel_deleted", cache_subscriber.on_channel_deleted)
-    
+
     logger.info("✅ Cache Subscriber registrado")
     """

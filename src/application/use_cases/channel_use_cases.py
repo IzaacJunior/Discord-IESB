@@ -34,6 +34,21 @@ class CreateChannelUseCase:
         self.channel_repository = channel_repository
         self.event_bus = event_bus
 
+    def _raise_unsupported_channel_type(self, channel_type: ChannelType) -> None:
+        """
+        🚫 Lança exceção para tipo de canal não suportado
+
+        💡 Boa Prática: Abstrair raise facilita testes e manutenção
+
+        Args:
+            channel_type: Tipo de canal não suportado
+
+        Raises:
+            ValueError: Sempre, com mensagem descritiva
+        """
+        msg = f"Tipo de canal não suportado: {channel_type}"
+        raise ValueError(msg)
+
     async def execute(self, request: CreateChannelDTO) -> ChannelResponseDTO:
         """
         ✨ Executa a criação de um canal com verificação de duplicatas
@@ -95,8 +110,8 @@ class CreateChannelUseCase:
                     overwrites=request.overwrites,  # 🔒 Passa permissões customizadas
                 )
             else:
-                msg = f"Tipo de canal não suportado: {request.channel_type}"
-                raise ValueError(msg)
+                # 💡 Boa Prática: Abstrair raise para função interna facilita testes
+                self._raise_unsupported_channel_type(request.channel_type)
 
             logger.info(
                 "✅ Canal criado com sucesso: %s (ID: %s)", channel.name, channel.id

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -54,10 +55,10 @@ class TempRoomSlashCommands(commands.Cog):
             async with aiosqlite.connect(db_path) as db:
                 cursor = await db.execute(
                     """
-                    SELECT owner_id 
-                    FROM temporary_channels 
-                    WHERE channel_id = ? 
-                    AND guild_id = ? 
+                    SELECT owner_id
+                    FROM temporary_channels
+                    WHERE channel_id = ?
+                    AND guild_id = ?
                     AND is_active = 1
                     """,
                     (voice_channel.id, interaction.guild_id),
@@ -67,8 +68,8 @@ class TempRoomSlashCommands(commands.Cog):
                 if result:
                     return voice_channel, result[0]
 
-        except Exception as e:
-            logger.error("❌ Erro ao buscar dono da sala: %s", str(e))
+        except Exception:
+            logger.exception("❌ Erro ao buscar dono da sala")
 
         return None, None
 
@@ -136,17 +137,15 @@ class TempRoomSlashCommands(commands.Cog):
                 interaction.user.name,
             )
 
-            # Tenta notificar o usuário adicionado
-            try:
+            # 💡 Boa Prática: contextlib.suppress para suprimir erros esperados
+            # Tenta notificar, mas não é crítico se falhar (DMs desabilitadas)
+            with contextlib.suppress(discord.Forbidden):
                 await usuario.send(
                     f"🎉 **{interaction.user.display_name}** te adicionou à sala temporária!\n"
                     f"📍 Servidor: **{interaction.guild.name}**\n"
                     f"🔊 Canal: {voice_channel.mention}\n\n"
                     f"💡 Você já pode entrar na sala!"
                 )
-            except discord.Forbidden:
-                # Usuário tem DMs fechadas, ignora
-                pass
 
         except discord.Forbidden:
             await interaction.response.send_message(
@@ -230,11 +229,11 @@ class TempRoomSlashCommands(commands.Cog):
             )
 
     @app_commands.command(
-        name="sala-info", description="ℹ️ Mostra informações sobre sua sala temporária"
+        name="sala-info", description="i️ Mostra informações sobre sua sala temporária"
     )
     async def room_info(self, interaction: discord.Interaction) -> None:
         """
-        ℹ️ Exibe informações detalhadas da sala temporária.
+        i️ Exibe informações detalhadas da sala temporária.
 
         💡 Útil para ver quem tem acesso e configurações atuais
         """
@@ -268,13 +267,15 @@ class TempRoomSlashCommands(commands.Cog):
             special_access = []
             if is_private:
                 for target, overwrite in voice_channel.overwrites.items():
-                    if isinstance(target, discord.Member) and target.id != owner_id:
-                        if overwrite.view_channel is True:
-                            special_access.append(target.mention)
+                    # 💡 Boa Prática: Combinar condições com 'and' ao invés de aninhar ifs
+                    if (isinstance(target, discord.Member)
+                        and target.id != owner_id
+                        and overwrite.view_channel is True):
+                        special_access.append(target.mention)
 
             # Cria embed informativa
             embed = discord.Embed(
-                title="ℹ️ Informações da Sala Temporária",
+                title="i️ Informações da Sala Temporária",
                 description=f"**{voice_channel.name}**",
                 color=discord.Color.blue(),
             )

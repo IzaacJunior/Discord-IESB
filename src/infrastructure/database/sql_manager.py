@@ -236,7 +236,7 @@ class SQLCategoryManager:
         """
         try:
             # 🛡️ Garante que a tabela existe antes de verificar
-            await self.db_manager._ensure_table_exists()
+            await self.db_manager.ensure_table_exists()
 
             query = QueryBuilder.build_exists_query(self.table_name)
 
@@ -262,7 +262,7 @@ class SQLCategoryManager:
                 return False
 
             # Garante que a tabela existe antes de inserir
-            await self.db_manager._ensure_table_exists()
+            await self.db_manager.ensure_table_exists()
 
             query = QueryBuilder.build_insert_category_query(self.table_name)
 
@@ -288,7 +288,7 @@ class SQLCategoryManager:
             raise ValidationError(field_name, key, error_msg)
 
         try:
-            await self.db_manager._ensure_table_exists()
+            await self.db_manager.ensure_table_exists()
 
             query = QueryBuilder.build_select_value_query(self.table_name)
 
@@ -409,7 +409,7 @@ class SQLCategoryManager:
         💡 Boa Prática: Query otimizada DISTINCT!
         """
         try:
-            await self.db_manager._ensure_table_exists()
+            await self.db_manager.ensure_table_exists()
 
             query = QueryBuilder.build_list_keys_query(self.table_name)
 
@@ -434,7 +434,7 @@ class SQLCategoryManager:
             raise ValidationError(field_name, key, error_msg)
 
         try:
-            await self.db_manager._ensure_table_exists()
+            await self.db_manager.ensure_table_exists()
 
             query = QueryBuilder.build_delete_key_query(self.table_name)
 
@@ -469,11 +469,12 @@ class SQLTableManager:
         self.db_manager = db_manager
         self.table_name = QueryBuilder.sanitize_table_name(table_name)
 
-    async def _ensure_table_exists(self) -> None:
+    async def ensure_table_exists(self) -> None:
         """
         Garante que a tabela existe
 
         💡 Boa Prática: CREATE TABLE IF NOT EXISTS com índices!
+        🔓 Método público para permitir verificação externa
         """
         try:
             query = QueryBuilder.build_create_table_query(self.table_name)

@@ -207,12 +207,12 @@ async def start() -> None:
                                 "action": "cleanup_on_shutdown",
                             },
                         )
-            except Exception as e:
-                logger.error(f"❌ Erro ao limpar salas: {e!s}")
+            except Exception:
+                # 💡 Boa Prática: logger.exception() já captura o erro automaticamente
+                logger.exception("❌ Erro ao limpar salas")
                 audit.error(
-                    f"{__name__} | Erro ao limpar salas temporárias: {e}",
+                    f"{__name__} | Erro ao limpar salas temporárias",
                     extra={
-                        "error_type": type(e).__name__,
                         "action": "cleanup_on_shutdown",
                     },
                 )

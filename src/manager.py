@@ -192,7 +192,8 @@ class CleanArchitectureManager:
             try:
                 await self.bot.tree.sync()
                 logger.info("✅ Comandos slash sincronizados com sucesso!")
-            except Exception as e:
+            except (discord.HTTPException, discord.Forbidden) as e:
+                # 💡 Boa Prática: Capturar exceções específicas do discord.py
                 audit.error(
                     f"{__name__} | Falha ao sincronizar comandos slash",
                     extra={
@@ -200,6 +201,7 @@ class CleanArchitectureManager:
                         "module": "manager.on_ready",
                     },
                 )
+                logger.exception("❌ Erro ao sincronizar comandos slash")
             audit.info(
                 f"{__name__} | 🤖 Bot conectado: %s (ID: %s) | Servidores: %d",
                 self.bot.user.name,

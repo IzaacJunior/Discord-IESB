@@ -53,7 +53,7 @@ class UserStatsSubscriber:
                 logger.warning("⚠️ Evento sem owner_id, ignorando stats")
                 return
 
-            # ➕ Incrementa contador
+            # + Incrementa contador
             self.user_stats[owner_id]["rooms_created"] += 1
 
             total_rooms = self.user_stats[owner_id]["rooms_created"]
@@ -64,8 +64,7 @@ class UserStatsSubscriber:
                 total_rooms,
             )
 
-            # 💡 Aqui você salvaria no banco de dados:
-            # await self.db.update_user_stats(owner_id, self.user_stats[owner_id])
+            # 💡 Futuro: Persistir stats no banco de dados para análise histórica
 
             # 🏆 Verifica conquistas baseadas em stats
             if total_rooms == 1:
@@ -75,8 +74,8 @@ class UserStatsSubscriber:
             elif total_rooms == 100:
                 logger.info("🏆 Usuário %s criou 100 salas! 🎉", owner_id)
 
-        except Exception as e:
-            logger.error("❌ Erro ao atualizar stats de criação: %s", str(e))
+        except Exception:
+            logger.exception("❌ Erro ao atualizar stats de criação")
 
     async def on_temp_room_deleted(self, event: DomainEvent) -> None:
         """
@@ -92,7 +91,7 @@ class UserStatsSubscriber:
             if not owner_id:
                 return
 
-            # ➕ Incrementa contadores
+            # + Incrementa contadores
             self.user_stats[owner_id]["rooms_deleted"] += 1
             self.user_stats[owner_id]["total_room_time_seconds"] += duration
 
@@ -105,8 +104,8 @@ class UserStatsSubscriber:
                 stats["total_room_time_seconds"],
             )
 
-        except Exception as e:
-            logger.error("❌ Erro ao atualizar stats de exclusão: %s", str(e))
+        except Exception:
+            logger.exception("❌ Erro ao atualizar stats de exclusão")
 
     async def on_command_executed(self, event: DomainEvent) -> None:
         """
@@ -121,7 +120,7 @@ class UserStatsSubscriber:
             if not user_id:
                 return
 
-            # ➕ Incrementa contador
+            # + Incrementa contador
             self.user_stats[user_id]["commands_executed"] += 1
 
             total_commands = self.user_stats[user_id]["commands_executed"]
@@ -140,8 +139,8 @@ class UserStatsSubscriber:
                     total_commands,
                 )
 
-        except Exception as e:
-            logger.error("❌ Erro ao atualizar stats de comando: %s", str(e))
+        except Exception:
+            logger.exception("❌ Erro ao atualizar stats de comando")
 
     def get_user_stats(self, user_id: int) -> dict[str, int]:
         """

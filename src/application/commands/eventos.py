@@ -165,11 +165,10 @@ class Eventos(commands.Cog):
                     category.name,
                 )
 
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "❌ Erro ao processar entrada de membro %s: %s",
+                "❌ Erro ao processar entrada de membro %s",
                 member.display_name,
-                str(e),
             )
 
 

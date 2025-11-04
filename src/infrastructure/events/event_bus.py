@@ -77,9 +77,12 @@ class EventBus:
             >>> event_bus.subscribe("temp_room_created", send_notification)
         """
         if not asyncio.iscoroutinefunction(handler):
-            raise TypeError(
+            msg = (
                 f"Handler deve ser uma coroutine (async function). "
                 f"Recebido: {type(handler).__name__}"
+            )
+            raise TypeError(
+                msg
             )
 
         self._handlers[event_type].append(handler)
@@ -106,12 +109,14 @@ class EventBus:
         if event_type not in self._handlers:
             return False
 
+        # 💡 Boa Prática: Usar else após try-except para melhor clareza
         try:
             self._handlers[event_type].remove(handler)
-            logger.info("🔕 Handler removido: %s -> %s", event_type, handler.__name__)
-            return True
         except ValueError:
             return False
+        else:
+            logger.info("🔕 Handler removido: %s -> %s", event_type, handler.__name__)
+            return True
 
     async def publish(self, event: DomainEvent) -> None:
         """
@@ -185,15 +190,13 @@ class EventBus:
         """
         handler_name = handler.__name__
 
+        # 💡 Boa Prática: Usar else após try-except para melhor fluxo de código
         try:
             logger.debug("⚙️ Executando handler: %s", handler_name)
             await handler(event)
 
             # 📊 Atualiza estatísticas
             self._stats[event.event_type]["handlers_executed"] += 1
-
-            logger.debug("✅ Handler executado com sucesso: %s", handler_name)
-            return True
 
         except Exception as e:
             # 📊 Atualiza estatísticas de falha
@@ -207,10 +210,13 @@ class EventBus:
                 exc_info=True,  # 🔍 Inclui stack trace completo
             )
 
-            # 💡 Aqui você pode integrar com Sentry ou outro monitoring
-            # await self._report_to_monitoring(e, handler_name, event)
+            # 💡 Futuro: Integrar com Sentry para monitoring de erros em produção
 
             return False
+
+        else:
+            logger.debug("✅ Handler executado com sucesso: %s", handler_name)
+            return True
 
     def get_handlers(self, event_type: str) -> list[EventHandler]:
         """
@@ -219,6 +225,17 @@ class EventBus:
         Útil para debugging e testes!
         """
         return self._handlers.get(event_type, []).copy()
+
+    def get_total_handlers(self) -> int:
+        """
+        📊 Retorna total de handlers registrados
+
+        💡 Boa Prática: Método público para acesso a estatísticas
+
+        Returns:
+            Número total de handlers registrados em todos os eventos
+        """
+        return sum(len(handlers) for handlers in self._handlers.values())
 
     def get_stats(self, event_type: str | None = None) -> dict[str, Any]:
         """

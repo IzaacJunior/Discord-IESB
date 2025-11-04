@@ -26,8 +26,6 @@ UNIQUE_CHANNELS_SQL = SQL_SCRIPTS_PATH / "create_unique_channels_tables.sql"
 
 # 🎯 Outras configurações
 # 💡 Adicione aqui qualquer path ou configuração que precise centralizar!
-# LOGS_PATH = PROJECT_ROOT / "logs"
-# BACKUPS_PATH = PROJECT_ROOT / "backups"
 
 # 🎮 Configurações de Salas Temporárias
 # 💡 Valores padrão para salas temporárias (antes buscados do banco)

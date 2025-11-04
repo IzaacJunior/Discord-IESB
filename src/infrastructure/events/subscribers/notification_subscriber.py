@@ -75,12 +75,10 @@ class NotificationSubscriber:
             )
 
             # 💡 Aqui você integraria com sistemas reais:
-            # await self._send_to_discord_webhook(notification)
-            # await self._send_to_admin_channel(guild_id, notification)
-            # await self._send_to_logging_channel(guild_id, notification)
 
-        except Exception as e:
-            logger.error("❌ Erro ao enviar notificação: %s", str(e))
+        except Exception:
+            # 💡 Boa Prática: logger.exception() já captura o erro automaticamente
+            logger.exception("❌ Erro ao enviar notificação")
 
     async def on_temp_room_deleted(self, event: DomainEvent) -> None:
         """
@@ -111,8 +109,8 @@ class NotificationSubscriber:
                 duration,
             )
 
-        except Exception as e:
-            logger.error("❌ Erro ao notificar exclusão: %s", str(e))
+        except Exception:
+            logger.exception("❌ Erro ao notificar exclusão")
 
     async def on_member_joined_guild(self, event: DomainEvent) -> None:
         """
@@ -144,10 +142,9 @@ class NotificationSubscriber:
             )
 
             # 💡 Pode enviar mensagem de boas-vindas
-            # await self._send_welcome_message(guild_id, member_id)
 
-        except Exception as e:
-            logger.error("❌ Erro ao notificar novo membro: %s", str(e))
+        except Exception:
+            logger.exception("❌ Erro ao notificar novo membro")
 
     async def _send_to_discord_webhook(self, notification: dict) -> None:
         """
@@ -161,7 +158,7 @@ class NotificationSubscriber:
         # Implementação exemplo (você adicionaria a URL do webhook):
         """
         webhook_url = os.getenv("ADMIN_WEBHOOK_URL")
-        
+
         if webhook_url:
             async with aiohttp.ClientSession() as session:
                 embed = {
@@ -169,7 +166,7 @@ class NotificationSubscriber:
                     "color": 0x00ff00,
                     "timestamp": notification["timestamp"]
                 }
-                
+
                 await session.post(
                     webhook_url,
                     json={"embeds": [embed]}

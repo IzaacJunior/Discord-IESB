@@ -50,10 +50,12 @@ class DomainEvent:
         que eventos sejam sempre válidos!
         """
         if not self.event_type:
-            raise ValueError("event_type não pode estar vazio")
+            msg = "event_type não pode estar vazio"
+            raise ValueError(msg)
 
         if not isinstance(self.data, dict):
-            raise TypeError("data deve ser um dicionário")
+            msg = "data deve ser um dicionário"
+            raise TypeError(msg)
 
 
 # 💡 Type alias para handlers de eventos

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -56,10 +57,10 @@ class ChangeNameModal(discord.ui.Modal, title="✏️ Alterar Nome da Sala"):
             await interaction.response.send_message(
                 "❌ Sem permissão para alterar o nome da sala!", ephemeral=True
             )
-        except Exception as e:
-            logger.error("❌ Erro ao alterar nome: %s", str(e))
+        except (discord.HTTPException, discord.NotFound):
+            logger.exception("❌ Erro ao alterar nome")
             await interaction.response.send_message(
-                f"❌ Erro ao alterar nome: {e!s}", ephemeral=True
+                "❌ Erro ao alterar nome da sala!", ephemeral=True
             )
 
 
@@ -118,10 +119,10 @@ class ChangeLimitModal(discord.ui.Modal, title="👥 Alterar Limite de Usuários
             await interaction.response.send_message(
                 "❌ Sem permissão para alterar o limite da sala!", ephemeral=True
             )
-        except Exception as e:
-            logger.error("❌ Erro ao alterar limite: %s", str(e))
+        except (discord.HTTPException, discord.NotFound):
+            logger.exception("❌ Erro ao alterar limite")
             await interaction.response.send_message(
-                f"❌ Erro ao alterar limite: {e!s}", ephemeral=True
+                "❌ Erro ao alterar o limite da sala!", ephemeral=True
             )
 
 
@@ -222,27 +223,28 @@ class AddUserModal(discord.ui.Modal, title="👁️ Adicionar Pessoa"):
             )
 
             logger.info(
-                "�️ Usuário adicionado via modal | channel=%s | user=%s",
+                "👁️ Usuário adicionado via modal | channel=%s | user=%s",
                 self.voice_channel.name,
                 member.name,
             )
 
-            # Tenta notificar
-            try:
+            # 💡 Boa Prática: contextlib.suppress para suprimir erros esperados
+            # Tenta notificar, mas não é crítico se falhar (DMs desabilitadas)
+            with contextlib.suppress(discord.Forbidden):
                 await member.send(
                     f"🎉 Você foi adicionado a uma sala temporária!\n"
                     f"🔊 Canal: {self.voice_channel.mention} em **{interaction.guild.name}**"
                 )
-            except discord.Forbidden:
-                pass
 
         except discord.Forbidden:
             await interaction.response.send_message(
                 "❌ Sem permissão para adicionar usuários!", ephemeral=True
             )
-        except Exception as e:
+        except (discord.HTTPException, discord.NotFound):
             logger.exception("❌ Erro ao adicionar usuário via modal")
-            await interaction.response.send_message(f"❌ Erro: {e!s}", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Erro ao adicionar usuário!", ephemeral=True
+            )
 
 
 class TempRoomControlView(discord.ui.View):
@@ -373,9 +375,11 @@ class TempRoomControlView(discord.ui.View):
             await interaction.response.send_message(
                 "❌ Sem permissão para tornar a sala privada!", ephemeral=True
             )
-        except Exception as e:
-            logger.error("❌ Erro ao tornar sala privada: %s", str(e))
-            await interaction.response.send_message(f"❌ Erro: {e!s}", ephemeral=True)
+        except (discord.HTTPException, discord.NotFound):
+            logger.exception("❌ Erro ao tornar sala privada")
+            await interaction.response.send_message(
+                "❌ Erro ao tornar a sala privada!", ephemeral=True
+            )
 
     @discord.ui.button(
         label="🌍 Pública", style=discord.ButtonStyle.secondary, custom_id="make_public"
@@ -405,9 +409,11 @@ class TempRoomControlView(discord.ui.View):
             await interaction.response.send_message(
                 "❌ Sem permissão para tornar a sala pública!", ephemeral=True
             )
-        except Exception as e:
-            logger.error("❌ Erro ao tornar sala pública: %s", str(e))
-            await interaction.response.send_message(f"❌ Erro: {e!s}", ephemeral=True)
+        except (discord.HTTPException, discord.NotFound):
+            logger.exception("❌ Erro ao tornar sala pública")
+            await interaction.response.send_message(
+                "❌ Erro ao tornar a sala pública!", ephemeral=True
+            )
 
     @discord.ui.button(
         label="👁️ Adicionar",
