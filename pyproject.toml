@@ -69,12 +69,8 @@ select = [
     "N"
 ]
 ignore = [
-    "COM812",   # trailing comma (questão de estilo)
-    "E501",     # line too long (ocasionalmente necessário)
     "FBT003",   # boolean args (APIs do Discord.py)
-    "C901",     # complex function (tratamento de erro)
-    "F841",     # unused vars (desenvolvimento)
-    "SLF001"    # private member access (callbacks internos)
+    "C901",     # complex function (tratamento de erros)
 ]
 
 [tool.ruff.lint.per-file-ignores]

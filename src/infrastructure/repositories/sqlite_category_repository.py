@@ -55,9 +55,7 @@ class SQLiteCategoryRepository(CategoryDatabaseRepository):
         💡 Boa Prática: Query simples e direta, fácil de entender e manter!
         """
         try:
-            logger.debug(
-                "🔍 Verificando se categoria %s é temp generator", category_id
-            )
+            logger.debug("🔍 Verificando se categoria %s é temp generator", category_id)
 
             async with aiosqlite.connect(self.db_path) as db:
                 cursor = await db.execute(
@@ -114,11 +112,12 @@ class SQLiteCategoryRepository(CategoryDatabaseRepository):
                 category_name,
                 category_id,
             )
-            return True
 
         except Exception:
             logger.exception("❌ Erro ao marcar categoria como temp generator")
             return False
+        else:
+            return True
 
     async def unmark_category_as_temp_generator(
         self,

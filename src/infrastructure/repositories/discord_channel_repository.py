@@ -14,18 +14,16 @@ class DiscordChannelRepository(ChannelRepository):
 
     💡 Boa Prática: Implementa a interface do domain usando
     a biblioteca específica (Discord.py)!
-    
+
     ✨ NOVO: Agora usa injeção de dependência para operações de banco de dados!
     """
 
-    def __init__(
-        self, bot: discord.Client, category_db: CategoryDatabaseRepository
-    ):
+    def __init__(self, bot: discord.Client, category_db: CategoryDatabaseRepository):
         """
         Inicializa o repository com bot Discord e repository de banco de dados
-        
+
         💡 Boa Prática: Injeção de Dependência (SOLID) - facilita testes e manutenção!
-        
+
         Args:
             bot: Cliente Discord.py
             category_db: Repository para operações de categoria no banco de dados
