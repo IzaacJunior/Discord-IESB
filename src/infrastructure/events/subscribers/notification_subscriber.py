@@ -10,6 +10,7 @@ import discord
 from domain.events import DomainEvent
 
 logger = logging.getLogger(__name__)
+audit = logging.getLogger("audit")
 
 
 class NotificationSubscriber:
@@ -77,7 +78,6 @@ class NotificationSubscriber:
             # 💡 Aqui você integraria com sistemas reais:
 
         except Exception:
-            # 💡 Boa Prática: logger.exception() já captura o erro automaticamente
             logger.exception("❌ Erro ao enviar notificação")
 
     async def on_temp_room_deleted(self, event: DomainEvent) -> None:

@@ -8,6 +8,7 @@ import logging
 from domain.events import DomainEvent
 
 logger = logging.getLogger(__name__)
+audit = logging.getLogger("audit")
 
 
 class AnalyticsSubscriber:

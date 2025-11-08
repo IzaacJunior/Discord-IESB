@@ -9,6 +9,7 @@ from collections import defaultdict
 from domain.events import DomainEvent
 
 logger = logging.getLogger(__name__)
+audit = logging.getLogger("audit")
 
 
 class UserStatsSubscriber:

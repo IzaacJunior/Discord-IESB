@@ -19,6 +19,7 @@ from domain.entities import ChannelType
 from presentation.views import TempRoomControlView, create_temp_room_embed
 
 logger = logging.getLogger(__name__)
+audit = logging.getLogger("audit")
 
 
 class ChannelController:
@@ -47,7 +48,7 @@ class ChannelController:
         topic: str | None = None,
     ) -> None:
         """Cria canal de texto via comando slash."""
-        logger.info("💬 Processando criação de canal de texto: %s", name)
+        logger.debug("💬 Processando criação de canal de texto: %s", name)
 
         if not name or not name.strip():
             await interaction.response.send_message(
@@ -99,7 +100,7 @@ class ChannelController:
         user_limit: int = 0,
     ) -> None:
         """Cria canal de voz via comando slash."""
-        logger.info("Processando criação de canal de voz: %s", name)
+        logger.debug("Processando criação de canal de voz: %s", name)
 
         if not name or not name.strip():
             await interaction.response.send_message(
@@ -185,7 +186,7 @@ class ChannelController:
             bool: True se fórum foi criado com sucesso
         """
         try:
-            logger.info("🏠 Criando fórum privado para %s", member.display_name)
+            logger.debug("🏠 Criando fórum privado para %s", member.display_name)
 
             # Gera nome do fórum baseado no membro
             forum_name = f"{member.display_name.lower()}"
@@ -221,7 +222,7 @@ class ChannelController:
                     ),
                 )
 
-                logger.info(
+                logger.debug(
                     "✅ Thread de boas-vindas criada | thread=%s",
                     welcome_thread.thread.name,
                 )
@@ -231,16 +232,15 @@ class ChannelController:
                 discord.Forbidden,
                 discord.InvalidArgument,
             ) as thread_error:
-                logger.warning(
+                logger.debug(
                     "⚠️ Não foi possível criar thread de boas-vindas: %s",
                     str(thread_error),
                 )
 
             logger.info(
-                "Fórum privado criado | member=%s | forum=%s | id=%s",
+                "📰 Fórum privado criado para %s",
                 member.display_name,
-                forum_channel.name,
-                forum_channel.id,
+                extra={"member_id": member.id, "forum_name": forum_channel.name},
             )
 
         except Exception:
@@ -279,7 +279,7 @@ class ChannelController:
             bool: True se fórum foi criado com sucesso
         """
         try:
-            logger.info(
+            logger.debug(
                 "🏫 Processando criação de fórum: %s na categoria %s",
                 forum_name,
                 category.name,
@@ -297,22 +297,23 @@ class ChannelController:
             match result.created, result.id > 0:
                 case True, _:
                     # ✅ Sucesso! Fórum criado
-                    logger.info(
-                        "✅ Fórum criado com sucesso | forum=%s | id=%s",
-                        result.name,
-                        result.id,
+                    audit.info(
+                        f"{__name__} | 📝 Fórum criado com sucesso: {result.name}",
+                        extra={"forum_name": result.name, "forum_id": result.id},
                     )
                 case False, True:
                     # ⚠️ Aviso: Fórum já existe (NÃO é erro!)
-                    logger.warning(
-                        "⚠️ Fórum já existe | forum=%s | id=%s",
+                    logger.debug(
+                        "%s | ℹ️ Fórum já existe | forum=%s | id=%s",
+                        __name__,
                         forum_name,
                         result.id,
                     )
                 case False, False:
                     # ❌ Erro: Falha na criação
                     logger.error(
-                        "❌ Falha ao criar fórum | forum=%s | motivo=desconhecido",
+                        "%s | ❌ Falha ao criar fórum | forum=%s",
+                        __name__,
                         forum_name,
                     )
                     return False
@@ -384,13 +385,6 @@ class ChannelController:
         if not after.channel:
             return False
 
-        logger.info(
-            "SOLICITAÇÃO: %s entrou no canal '%s' (ID: %s)",
-            member.display_name,
-            after.channel.name,
-            after.channel.id,
-        )
-
         # CHECK 1: Já está em sala temporária?
         is_temp_channel = await self.channel_repository.is_temporary_channel(
             channel_id=after.channel.id,
@@ -398,15 +392,16 @@ class ChannelController:
         )
 
         if is_temp_channel:
-            logger.info(
-                "IGNORADO: %s entrou em sala temporária existente",
+            logger.debug(
+                "%s | 🔂 %s entrou em sala temporária existente",
+                __name__,
                 member.display_name,
             )
             return True
 
         # CHECK 2: Categoria é geradora?
         if not after.channel.category:
-            logger.debug("IGNORADO: Canal sem categoria")
+            logger.debug("%s | ⏭️ Canal sem categoria", __name__)
             return False
 
         is_generator_category = await self.channel_repository.is_temp_room_category(
@@ -416,14 +411,19 @@ class ChannelController:
         )
 
         if not is_generator_category:
-            logger.info(
-                "IGNORADO: Categoria '%s' não é geradora",
+            logger.debug(
+                "%s | ⏭️ Categoria '%s' não é geradora",
+                __name__,
                 after.channel.category.name,
             )
             return False
 
         # Categoria é geradora → Cria sala temporária
-        logger.info("ACEITO: Criando sala temporária para %s", member.display_name)
+        logger.info(
+            "%s | ✅ Criando sala temporária para %s",
+            __name__,
+            member.display_name,
+        )
         return await self._create_temporary_room(member, after)
 
     async def _create_temporary_room(
@@ -453,7 +453,8 @@ class ChannelController:
             )
 
             logger.debug(
-                "Copiando %d permissões do canal gerador '%s'",
+                "%s | 🔧 Copiando %d permissões do canal gerador '%s'",
+                __name__,
                 len(parent_channel.overwrites),
                 parent_channel.name,
             )
@@ -471,8 +472,9 @@ class ChannelController:
                 overwrites=overwrites,  # Passa permissões clonadas + dono
             )
 
-            logger.info(
-                "🔊 Criando sala temporária '%s' para %s (clone completo)",
+            logger.debug(
+                "%s | � Criando sala temporária '%s' para %s",
+                __name__,
                 create_dto.name,
                 member.display_name,
             )
@@ -510,9 +512,9 @@ class ChannelController:
                                 view=view,
                             )
 
-                            logger.info(
-                                "Embed de controle enviada APENAS na criação "
-                                "| canal_voz=%s",
+                            logger.debug(
+                                "%s | 💬 Embed de controle enviada | canal=%s",
+                                __name__,
                                 new_channel.name,
                             )
 
@@ -521,31 +523,32 @@ class ChannelController:
                             discord.Forbidden,
                         ):
                             logger.exception(
-                                "Erro ao enviar embed de controle",
+                                "%s | ❌ Erro ao enviar embed de controle",
+                                __name__,
                             )
                             # Não falha a criação da sala se embed der erro
                     else:
                         logger.debug(
-                            "Sala já existia, embed NÂO enviada | canal=%s",
+                            "%s | ⏭️ Sala já existia, embed NÃO enviada | canal=%s",
+                            __name__,
                             new_channel.name,
                         )
 
-                    # Move usuário para sala (depois da embed)
                     await member.move_to(new_channel)
                     logger.info(
-                        "%s movido para sala '%s' (ID: %s)",
+                        "%s | 🎤 %s movido para '%s'",
+                        __name__,
                         member.display_name,
                         new_channel.name,
-                        new_channel.id,
                     )
 
                 else:
-                    logger.error("Canal ID %s não encontrado", result.id)
+                    logger.error("%s | ❌ Canal ID %s não encontrado", __name__, result.id)
             else:
-                logger.error("Falha ao criar sala para %s", member.display_name)
+                logger.error("%s | ❌ Falha ao criar sala para %s", __name__, member.display_name)
 
         except (discord.HTTPException, RuntimeError):
-            logger.exception("Erro ao criar sala temporária")
+            logger.exception("%s | ❌ Erro ao criar sala temporária", __name__)
             return False
         else:
             return True
@@ -563,10 +566,10 @@ class ChannelController:
             return False
 
         logger.debug(
-            "%s saiu do canal '%s' (ID: %s)",
+            "%s | 🚪 %s saiu do canal '%s'",
+            __name__,
             member.display_name,
             before.channel.name,
-            before.channel.id,
         )
 
         # Verifica se é sala temporária
@@ -576,7 +579,7 @@ class ChannelController:
         )
 
         if not is_temp_channel:
-            logger.debug("Canal '%s' não é temporário, ignorando", before.channel.name)
+            logger.debug("%s | ⏭️ Canal '%s' não é temporário", __name__, before.channel.name)
             return False
 
         # Verifica se está vazio
@@ -584,15 +587,17 @@ class ChannelController:
 
         if not channel_is_empty:
             logger.debug(
-                "Sala temporária '%s' ainda tem %d membros",
+                "%s | ℹ️ Sala temporária '%s' ainda tem %d membros",
+                __name__,
                 before.channel.name,
                 len(before.channel.members),
             )
             return False
 
         # Sala está vazia → Aguarda 3s antes de deletar
-        logger.info(
-            "Sala temporária '%s' ficou vazia. Aguardando 3s antes de deletar...",
+        logger.debug(
+            "%s | ⏳ Sala temporária '%s' ficou vazia. Aguardando 3s antes de deletar...",
+            __name__,
             before.channel.name,
         )
 
@@ -603,19 +608,24 @@ class ChannelController:
             channel_check = member.guild.get_channel(before.channel.id)
 
             if channel_check is None:
-                logger.debug("Canal '%s' já foi removido", before.channel.name)
+                logger.debug("%s | ⏭️ Canal já foi removido", __name__)
                 return True
 
             if len(channel_check.members) > 0:
                 logger.debug(
-                    "Canal '%s' não está mais vazio (%d membros), mantendo",
+                    "%s | ℹ️ Canal '%s' não está mais vazio (%d membros), mantendo",
+                    __name__,
                     channel_check.name,
                     len(channel_check.members),
                 )
                 return True
 
             # Confirma vazio → Deleta
-            logger.info("Confirmado vazio após 3s. Deletando: '%s'", channel_check.name)
+            logger.debug(
+                "%s | 🗑️ Confirmado vazio após 3s. Deletando: '%s'",
+                __name__,
+                channel_check.name,
+            )
 
             # Marca no banco como inativo
             await self._remove_temp_channel_from_database(
@@ -631,11 +641,15 @@ class ChannelController:
                 reason=f"Sala temporária vazia - último usuário: {member.display_name}",
             )
 
-            logger.info("Sala temporária '%s' removida com sucesso", channel_check.name)
+            audit.info(
+                f"{__name__} | 🗑️ Sala temporária '{channel_check.name}' removida",
+                extra={"channel_id": channel_check.id},
+            )
 
         except (discord.HTTPException, discord.Forbidden):
             logger.exception(
-                "Erro ao deletar canal '%s'",
+                "%s | ❌ Erro ao deletar canal '%s'",
+                __name__,
                 before.channel.name,
             )
             return False
@@ -656,7 +670,7 @@ class ChannelController:
         Quando alguém entrar em canal dessa categoria, cria sala temporária.
         """
         try:
-            logger.info("Marcando categoria '%s' como geradora", category.name)
+            logger.debug("🏗️ Marcando categoria '%s' como geradora", category.name)
 
             # Verifica se já está marcada
             is_already_marked = await self.channel_repository.is_temp_room_category(
@@ -665,7 +679,7 @@ class ChannelController:
             )
 
             if is_already_marked:
-                logger.warning("Categoria '%s' já está marcada", category.name)
+                logger.debug("ℹ️ Categoria '%s' já está marcada", category.name)
                 return False
 
             # Marca categoria
@@ -676,12 +690,15 @@ class ChannelController:
             )
 
             if success:
-                logger.info("Categoria '%s' marcada como geradora", category.name)
+                audit.info(
+                    f"{__name__} | 🏗️ Categoria '{category.name}' marcada como geradora",
+                    extra={"category_id": category.id, "guild_id": guild_id},
+                )
             else:
-                logger.error("Falha ao marcar categoria '%s'", category.name)
+                logger.error("%s | ❌ Falha ao marcar categoria '%s'", __name__, category.name)
 
         except (ValueError, OSError):
-            logger.exception("Erro ao marcar categoria")
+            logger.exception("%s | ❌ Erro ao marcar categoria", __name__)
             return False
         else:
             return success
@@ -701,7 +718,7 @@ class ChannelController:
             bool: True se categoria foi desmarcada (independente de haver canais)
         """
         try:
-            logger.info("Removendo marcação de categoria ID %s", category_id)
+            logger.debug("🔄 Removendo marcação de categoria ID %s", category_id)
 
             # Primeiro busca todos os canais temporários dessa categoria
             channel_ids = await self.channel_repository.get_temp_channels_by_category(
@@ -712,8 +729,8 @@ class ChannelController:
             # Deleta todos os canais temporários encontrados
             deleted_count = 0
             if channel_ids:
-                logger.info(
-                    "Deletando %d canais temporários da categoria %s",
+                logger.debug(
+                    "🗑️ Deletando %d canais temporários da categoria %s",
                     len(channel_ids),
                     category_id,
                 )
@@ -727,33 +744,34 @@ class ChannelController:
 
                         if success:
                             deleted_count += 1
-                            logger.debug("Canal %s deletado", channel_id)
+                            logger.debug("🗑️ Canal %s deletado", channel_id)
                         else:
-                            logger.warning(
-                                "Canal %s não encontrado no Discord",
+                            logger.debug(
+                                "ℹ️ Canal %s não encontrado no Discord",
                                 channel_id,
                             )
 
                     except (discord.HTTPException, discord.Forbidden):
                         logger.exception(
-                            "Erro ao deletar canal %s",
+                            "%s | ❌ Erro ao deletar canal %s",
+                            __name__,
                             channel_id,
                         )
 
                 # Log do resultado da limpeza com pattern matching
                 match deleted_count:
                     case 0:
-                        logger.warning("Nenhum canal foi deletado")
+                        logger.debug("ℹ️ Nenhum canal foi deletado")
                     case count if count == len(channel_ids):
-                        logger.info("Todos os %d canais deletados com sucesso!", count)
+                        logger.debug("✅ Todos os %d canais deletados com sucesso!", count)
                     case count:
-                        logger.warning(
-                            "Apenas %d de %d canais foram deletados",
+                        logger.debug(
+                            "⚠️ Apenas %d de %d canais foram deletados",
                             count,
                             len(channel_ids),
                         )
             else:
-                logger.info("Nenhum canal temporário encontrado na categoria")
+                logger.debug("ℹ️ Nenhum canal temporário encontrado na categoria")
 
             # Remove marcação da categoria (independente dos canais)
             success = await self.channel_repository.unmark_category_as_temp_generator(
@@ -762,17 +780,15 @@ class ChannelController:
             )
 
             if success:
-                logger.info(
-                    "Categoria ID %s desmarcada | Canais deletados: %d/%d",
-                    category_id,
-                    deleted_count,
-                    len(channel_ids),
+                audit.info(
+                    f"{__name__} | 🔄 Categoria desmarcada | {deleted_count} canais deletados",
+                    extra={"category_id": category_id, "deleted_count": deleted_count},
                 )
             else:
-                logger.warning("Categoria ID %s não estava marcada", category_id)
+                logger.debug("ℹ️ Categoria ID %s não estava marcada", category_id)
 
         except (ValueError, OSError):
-            logger.exception("Erro ao desmarcar categoria")
+            logger.exception("%s | ❌ Erro ao desmarcar categoria", __name__)
             return False
         else:
             return success
@@ -796,7 +812,7 @@ class ChannelController:
             bool: True se categoria foi marcada com sucesso
         """
         try:
-            logger.info("Marcando categoria '%s' para fóruns únicos", category.name)
+            logger.debug("🏗️ Marcando categoria '%s' para fóruns únicos", category.name)
 
             # Marca categoria no banco de dados
             success = await self.channel_repository.mark_category_as_unique_generator(
@@ -806,12 +822,15 @@ class ChannelController:
             )
 
             if success:
-                logger.info("Categoria '%s' marcada para fóruns únicos", category.name)
+                audit.info(
+                    f"{__name__} | 📰 Categoria '{category.name}' marcada para fóruns únicos",
+                    extra={"category_id": category.id, "guild_id": guild_id},
+                )
             else:
-                logger.warning("Categoria '%s' já estava marcada", category.name)
+                logger.debug("ℹ️ Categoria '%s' já estava marcada", category.name)
 
         except Exception:
-            logger.exception("Erro ao marcar categoria para fóruns únicos")
+            logger.exception("%s | ❌ Erro ao marcar categoria para fóruns únicos", __name__)
             return False
         else:
             return success
@@ -830,7 +849,7 @@ class ChannelController:
             bool: True se categoria foi desmarcada
         """
         try:
-            logger.info("Removendo marcação de categoria ID %s", category_id)
+            logger.debug("🔄 Removendo marcação de categoria ID %s", category_id)
 
             # Remove marcação do banco
             success = await self.channel_repository.unmark_category_as_unique_generator(
@@ -839,12 +858,15 @@ class ChannelController:
             )
 
             if success:
-                logger.info("Categoria ID %s desmarcada", category_id)
+                audit.info(
+                    f"{__name__} | 🔄 Categoria desmarcada",
+                    extra={"category_id": category_id},
+                )
             else:
-                logger.warning("Categoria ID %s não estava marcada", category_id)
+                logger.debug("ℹ️ Categoria ID %s não estava marcada", category_id)
 
         except (ValueError, OSError):
-            logger.exception("Erro ao desmarcar categoria")
+            logger.exception("%s | ❌ Erro ao desmarcar categoria", __name__)
             return False
         else:
             return success
@@ -884,16 +906,18 @@ class ChannelController:
             )
 
             if already_has_channel:
-                logger.info(
-                    "IGNORADO: Membro %s já tem canal único na categoria %s",
+                logger.debug(
+                    "%s | 🔂 Membro %s já tem canal único na categoria %s",
+                    __name__,
                     member.display_name,
                     category_id,
                 )
                 return True  # Não é erro, apenas já existe
 
             # Cria fórum privado único
-            logger.info(
-                "Criando fórum único para %s na categoria %s",
+            logger.debug(
+                "%s | 📝 Criando fórum único para %s na categoria %s",
+                __name__,
                 member.display_name,
                 category_id,
             )
@@ -919,11 +943,8 @@ class ChannelController:
 
             if registered:
                 logger.info(
-                    "Fórum único criado e registrado | member=%s | "
-                    "channel=%s | category=%s",
+                    "📰 Fórum único criado para %s",
                     member.display_name,
-                    forum_channel.name,
-                    category_id,
                 )
 
                 # Envia mensagem de boas-vindas no fórum
@@ -942,26 +963,28 @@ class ChannelController:
                             f"**Aproveite seu espaço pessoal!** 🎊"
                         ),
                     )
-                    logger.debug("Thread de boas-vindas criada")
+                    logger.debug("🧵 Thread de boas-vindas criada")
                 except (
                     discord.HTTPException,
                     discord.Forbidden,
                     discord.InvalidArgument,
                 ) as thread_error:
-                    logger.warning(
-                        "Não foi possível criar thread de boas-vindas: %s",
+                    logger.debug(
+                        "ℹ️ Não foi possível criar thread de boas-vindas: %s",
                         str(thread_error),
                     )
 
             else:
                 logger.error(
-                    "Fórum criado mas não foi registrado no banco",
+                    "%s | ❌ Fórum criado mas não foi registrado no banco",
+                    __name__,
                 )
                 return False
 
         except Exception:
             logger.exception(
-                "Erro ao criar fórum único para %s",
+                "%s | ❌ Erro ao criar fórum único para %s",
+                __name__,
                 member.display_name,
             )
             return False
@@ -1018,7 +1041,7 @@ class ChannelController:
         removed_count = 0
 
         try:
-            logger.info("Iniciando limpeza de todas as salas temporárias...")
+            logger.debug("%s | 🧹 Iniciando limpeza de salas temporárias...", __name__)
 
             db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
@@ -1032,8 +1055,10 @@ class ChannelController:
                 )
                 temp_channels = await cursor.fetchall()
 
-                logger.info(
-                    f"Encontradas {len(temp_channels)} salas temporárias ativas",
+                logger.debug(
+                    "%s | ℹ️ Encontradas %d salas temporárias ativas",
+                    __name__,
+                    len(temp_channels),
                 )
 
                 # Remove cada sala
@@ -1049,9 +1074,11 @@ class ChannelController:
                             await channel.delete(
                                 reason="Limpeza automática - Bot desconectando",
                             )
-                            logger.info(
-                                f"Sala removida: '{channel_name}' "
-                                f"(Categoria: '{category_name}')",
+                            logger.debug(
+                                "%s | 🗑️ Sala removida: '%s' (Categoria: '%s')",
+                                __name__,
+                                channel_name,
+                                category_name,
                             )
                             removed_count += 1
 
@@ -1067,13 +1094,21 @@ class ChannelController:
                             )
 
                     except Exception:
-                        logger.exception(f"Erro ao remover sala {channel_name}")
+                        logger.exception(
+                            "%s | ❌ Erro ao remover sala %s",
+                            __name__,
+                            channel_name,
+                        )
                         continue
 
-            logger.info(f"Limpeza concluída! {removed_count} salas removidas")
+            logger.debug(
+                "%s | ✅ Limpeza concluída! %d salas removidas",
+                __name__,
+                removed_count,
+            )
 
         except Exception:
-            logger.exception("Erro na limpeza geral")
+            logger.exception("%s | ❌ Erro na limpeza geral", __name__)
             return removed_count
         else:
             return removed_count

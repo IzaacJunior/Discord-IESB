@@ -43,7 +43,7 @@ class DiscordChannelRepository(ChannelRepository):
 
         💡 Boa Prática: Traduz entidades do domain para objetos Discord.py!
         """
-        logger.info("💬 Criando canal de texto: %s", name)
+        logger.debug("💬 Criando canal de texto: %s", name)
 
         guild = self.bot.get_guild(guild_id)
         if not guild:
@@ -98,7 +98,7 @@ class DiscordChannelRepository(ChannelRepository):
             bitrate: Taxa de bits para áudio
             overwrites: Permissões específicas para roles/membros (opcional)
         """
-        logger.info("🔊 Criando canal de voz: %s", name)
+        logger.debug("🔊 Criando canal de voz: %s", name)
 
         guild = self.bot.get_guild(guild_id)
         if not guild:

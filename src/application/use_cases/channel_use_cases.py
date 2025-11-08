@@ -55,7 +55,7 @@ class CreateChannelUseCase:
 
         💡 Boa Prática: Verifica duplicatas antes de criar!
         """
-        logger.info(
+        logger.debug(
             "🏗️ Iniciando criação de canal: %s (tipo: %s)",
             request.name,
             request.channel_type.value,
@@ -67,10 +67,9 @@ class CreateChannelUseCase:
         )
 
         if already_exists:
-            logger.warning(
-                "⚠️ Canal '%s' já existe no servidor %s - não criando duplicata",
+            logger.debug(
+                "⚠️ Canal '%s' já existe no servidor - não criando duplicata",
                 request.name,
-                request.guild_id,
             )
 
             # 🔍 Busca o canal existente para retornar seus dados
@@ -113,8 +112,11 @@ class CreateChannelUseCase:
                 # 💡 Boa Prática: Abstrair raise para função interna facilita testes
                 self._raise_unsupported_channel_type(request.channel_type)
 
-            logger.info(
-                "✅ Canal criado com sucesso: %s (ID: %s)", channel.name, channel.id
+            safe_name = channel.name.replace('\x00', ' ').encode('utf-8', errors='replace').decode('utf-8')
+            logger.debug(
+                "✅ Canal criado com sucesso: %s (ID: %s)",
+                safe_name,
+                channel.id
             )
 
             # 💾 Se é temporário, salva no banco de dados
@@ -180,7 +182,7 @@ class CreateChannelUseCase:
         import aiosqlite
 
         try:
-            logger.info("💾 Salvando canal temporário no banco: %s", channel_name)
+            logger.debug("💾 Salvando canal temporário no banco: %s", channel_name)
 
             db_path = DB_PATH
             async with aiosqlite.connect(db_path) as db:
@@ -201,9 +203,11 @@ class CreateChannelUseCase:
                 )
                 await db.commit()
 
-            logger.info(
+            # 💡 Boa Prática: Sanitizar nomes com caracteres especiais para log limpo
+            safe_name = channel_name.replace('\x00', ' ')  # Remove null bytes
+            logger.debug(
                 "✅ Canal temporário salvo no banco: %s (ID: %s)",
-                channel_name,
+                safe_name,
                 channel_id,
             )
 
@@ -305,7 +309,9 @@ class ManageTemporaryChannelsUseCase:
                 logger.warning("❌ Tipo de canal não suportado para temporário")
                 return None
 
-            logger.info("✅ Canal temporário criado: %s", temp_channel.name)
+            # 💡 Boa Prática: Sanitizar nomes com caracteres especiais para log limpo
+            safe_name = temp_channel.name.replace('\x00', ' ')  # Remove null bytes
+            logger.info("✅ Canal temporário criado: %s", safe_name)
 
             return ChannelResponseDTO(
                 id=temp_channel.id,
@@ -510,6 +516,8 @@ class CreateForumUseCase:
             logger.exception("❌ Erro ao salvar fórum no banco: %s")
             return False
         else:
+            # 💡 Boa Prática: Sanitizar nomes com caracteres especiais para log limpo
+            safe_name = forum_name.replace('\x00', ' ')  # Remove null bytes
             # 💡 Boa Prática: Bloco else deixa claro que retorna APENAS se nenhuma exceção ocorrer!
-            logger.info("✅ Fórum salvo no banco: %s (ID: %s)", forum_name, forum_id)
+            logger.info("✅ Fórum salvo no banco: %s (ID: %s)", safe_name, forum_id)
             return True

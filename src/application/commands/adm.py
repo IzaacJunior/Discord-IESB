@@ -4,10 +4,12 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands
 
+from application.use_cases.bot_use_cases import BotLifecycleUseCase
 from infrastructure.repositories import (
     DiscordChannelRepository,
     SQLiteCategoryRepository,
 )
+from presentation.controllers.bot_controller import BotController
 from presentation.controllers.channel_controller import ChannelController
 
 if TYPE_CHECKING:
@@ -25,10 +27,13 @@ class ADM(commands.Cog):
         self.bot = bot
 
         # 🏗️ Injeção de dependência (Clean Architecture!)
-        # 💡 Boa Prática: Repository de banco separado do repository Discord
         category_db_repository = SQLiteCategoryRepository()
         channel_repository = DiscordChannelRepository(bot, category_db_repository)
         self.channel_controller = ChannelController(channel_repository)
+        
+        # 🤖 Bot lifecycle controller
+        bot_lifecycle_use_case = BotLifecycleUseCase(bot)
+        self.bot_controller = BotController(bot_lifecycle_use_case)
 
     async def _validate_voice_state(
         self, ctx: commands.Context
@@ -58,11 +63,17 @@ class ADM(commands.Cog):
         """
         🔌 Desconecta o bot do Discord.
         """
-        await ctx.send("Desconectando o bot... Até logo!")
-        logger.info(
-            "🤖 Bot desconectado | admin=%s | guild=%s", ctx.author.name, ctx.guild.name
+        await ctx.send("Desconectando o bot com carinho... Até logo! 💕")
+        
+        # Usa o controller seguindo Clean Architecture
+        response = await self.bot_controller.shutdown(
+            admin_name=ctx.author.name,
+            guild_name=ctx.guild.name,
+            reason="Comando !des executado"
         )
-        await self.bot.close()
+        
+        if not response.success:
+            await ctx.send(f"❌ {response.message}", delete_after=5)
 
     @commands.command(
         name="cls", help="Limpa o canal de texto atual, de todo ou @ de um usuário"

@@ -12,7 +12,7 @@ import discord
 from decouple import config
 from discord.ext import commands
 
-# 📊 Inicializa sistema de auditoria (DEVE vir antes de pegar o logger!)
+from config import COMMAND_PREFIX
 from infrastructure.database.audit_logger import audit_logger  # noqa: F401
 from infrastructure.repositories import (
     DiscordChannelRepository,
@@ -24,7 +24,7 @@ from presentation.controllers import ChannelController
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 
 logger = logging.getLogger(__name__)
 audit = logging.getLogger("audit")
@@ -71,13 +71,10 @@ class CleanArchitectureBot:
         self.manager = CleanArchitectureManager(bot, self.container.channel_controller)
 
     async def load_clean_extensions(self) -> str:
-        """💡 Carrega extensões da Clean Architecture"""
-        logger.info("💡 Carregando extensões")
-
+        """Carrega extensões da Clean Architecture"""
         loaded = []
         failed = []
 
-        # Comandos tradicionais
         commands_dir = Path(__file__).parent / "application" / "commands"
         if commands_dir.exists():
             for file in commands_dir.glob("*.py"):
@@ -86,14 +83,13 @@ class CleanArchitectureBot:
                 try:
                     await self.bot.load_extension(f"application.commands.{file.stem}")
                     loaded.append(f"application.commands.{file.stem}")
-                    logger.info("✅ Comando: application.commands.%s", file.stem)
                 except (ImportError, ModuleNotFoundError, AttributeError) as e:
                     failed.append(f"application.commands.{file.stem}")
-                    logger.warning(
-                        "❌ Falha comando: application.commands.%s - %s", file.stem, e
+                    audit.warning(
+                        f"{__name__} | ❌ Falha ao carregar comando: {file.stem}",
+                        extra={"extension": f"application.commands.{file.stem}", "error": str(e)}
                     )
 
-        # Slash commands
         slash_dir = Path(__file__).parent / "application" / "slash_commands"
         if slash_dir.exists():
             for file in slash_dir.glob("*.py"):
@@ -104,27 +100,27 @@ class CleanArchitectureBot:
                         f"application.slash_commands.{file.stem}"
                     )
                     loaded.append(f"application.slash_commands.{file.stem}")
-                    logger.info("✅ Slash: application.slash_commands.%s", file.stem)
                 except (ImportError, ModuleNotFoundError, AttributeError) as e:
                     failed.append(f"application.slash_commands.{file.stem}")
-                    logger.warning(
-                        "❌ Falha slash: application.slash_commands.%s - %s",
-                        file.stem,
-                        e,
+                    audit.warning(
+                        f"{__name__} | ❌ Falha ao carregar slash: {file.stem}",
+                        extra={"extension": f"application.slash_commands.{file.stem}", "error": str(e)}
                     )
 
-        # Clean commands (futuro)
         clean_commands_file = Path(__file__).parent / "clean_commands.py"
         if clean_commands_file.exists():
             try:
                 await self.bot.load_extension("clean_commands")
                 loaded.append("clean_commands")
-                logger.info("✅ Clean commands carregado")
             except (ImportError, ModuleNotFoundError, AttributeError) as e:
                 failed.append("clean_commands")
-                logger.warning("❌ Falha clean commands: %s", e)
+                audit.warning(
+                    f"{__name__} | ❌ Falha ao carregar clean_commands",
+                    extra={"extension": "clean_commands", "error": str(e)}
+                )
 
-        status = f"✅ {len(loaded)} extensões carregadas"
+        total_extensions = len(loaded) + len(failed)
+        status = f"✅ {len(loaded)}/{total_extensions} extensões carregadas"
         if failed:
             status += f", ❌{len(failed)} falharam"
 
@@ -162,60 +158,99 @@ def setup_logging() -> None:
     discord_logger.setLevel(logging.WARNING)
 
 
+async def cleanup_temp_rooms() -> None:
+    """
+    🧹 Limpa todas as salas temporárias de todos os servidores
+    """
+    audit.info(
+        f"{__name__} | 🧹 Começando limpeza de recursos ao encerrar",
+        extra={"action": "cleanup_on_shutdown"},
+    )
+
+    try:
+        from manager import create_manager
+
+        manager = create_manager(bot)
+
+        for guild in bot.guilds:
+            try:
+                removed = (
+                    await manager.channel_controller.cleanup_all_temp_channels(guild)
+                )
+                if removed > 0:
+                    audit.info(
+                        f"{__name__} | 🧹 {removed} salas removidas do servidor {guild.name}",
+                        extra={
+                            "guild_id": guild.id,
+                            "guild_name": guild.name,
+                            "rooms_removed": removed,
+                            "action": "cleanup_on_shutdown",
+                        },
+                    )
+            except Exception:
+                logger.exception(f"❌ Erro ao limpar salas do servidor {guild.name}")
+                audit.error(
+                    f"{__name__} | ⚠️ Erro ao limpar salas de servidor específico",
+                    extra={
+                        "guild_id": guild.id,
+                        "guild_name": guild.name,
+                        "action": "cleanup_on_shutdown",
+                    },
+                )
+
+    except Exception:
+        logger.exception("❌ Erro crítico durante limpeza de salas")
+        audit.error(
+            f"{__name__} | ⚠️ Erro crítico durante limpeza de salas temporárias",
+            extra={"action": "cleanup_on_shutdown"},
+        )
+
+
 async def start() -> None:
-    """🚀 Função principal de inicialização"""
+    """
+    🚀 Função principal de inicialização
+
+    💡 Boa Prática: Gerencia ciclo de vida completo do bot com async context manager!
+    ✨ Segurança: Valida token antes de inicializar recursos
+    🧹 Limpeza: Garante que recursos sejam liberados corretamente
+    """
     setup_logging()
 
-    async with bot:
-        try:
-            token = config("TOKEN")
-        except (KeyError, ValueError, TypeError):
-            logger.exception("❌ Token não encontrado! Verifique .env")
-            return
+    # 🔐 STEP 1: Valida token ANTES de qualquer inicialização
+    try:
+        token = config("TOKEN")
+    except (KeyError, ValueError, TypeError):
+        audit.critical(
+            f"{__name__} | 🔐 Token não configurado em .env",
+            extra={"error_type": "TokenNotFound"},
+        )
+        return
 
+    async with bot:
         clean_bot = CleanArchitectureBot(bot)
         status = await clean_bot.load_clean_extensions()
         audit.info(f"{__name__} | {status}")
 
         try:
+            audit.info(
+                f"{__name__} | 🚀 Conectando ao Discord",
+                extra={"action": "bot_start"},
+            )
             await bot.start(token)
+        except discord.LoginFailure:
+            audit.critical(
+                f"{__name__} | 🔐 Token inválido durante start()",
+                extra={"error_type": "LoginFailure"},
+            )
+            raise
+        except Exception:
+            audit.error(
+                f"{__name__} | 🔴 Erro durante bot.start()",
+                extra={"error_type": "StartupError"},
+            )
+            raise
         finally:
-            logger.info("🧹 Limpando salas temporárias antes de encerrar...")
-            audit.info(f"{__name__} | Bot encerrando - limpando recursos")
-
-            try:
-                from manager import create_manager
-
-                manager = create_manager(bot)
-
-                for guild in bot.guilds:
-                    removed = (
-                        await manager.channel_controller.cleanup_all_temp_channels(
-                            guild
-                        )
-                    )
-                    if removed > 0:
-                        logger.info(
-                            f"🧹 {removed} salas removidas do servidor {guild.name}"
-                        )
-                        audit.info(
-                            f"{__name__} | Salas temporárias limpas ao encerrar",
-                            extra={
-                                "guild_id": guild.id,
-                                "guild_name": guild.name,
-                                "rooms_removed": removed,
-                                "action": "cleanup_on_shutdown",
-                            },
-                        )
-            except Exception:
-                # 💡 Boa Prática: logger.exception() já captura o erro automaticamente
-                logger.exception("❌ Erro ao limpar salas")
-                audit.error(
-                    f"{__name__} | Erro ao limpar salas temporárias",
-                    extra={
-                        "action": "cleanup_on_shutdown",
-                    },
-                )
+            await cleanup_temp_rooms()
 
 
 def main() -> None:
@@ -224,50 +259,45 @@ def main() -> None:
         asyncio.run(start())
 
     except KeyboardInterrupt:
-        logger.info("Bot interrompido pelo usuário (Ctrl+C)")
+        audit.info(
+            f"{__name__} | 👋 Bot interrompido pelo usuário (Ctrl+C)",
+            extra={"action": "shutdown"},
+        )
 
     except discord.LoginFailure:
-        logger.exception("❌ Token inválido! Verifique .env")
-        logger.info("💡 Dica: TOKEN=seu_token_aqui")
         audit.critical(
-            f"{__name__} | Falha de autenticação - Token inválido",
+            f"{__name__} | 🔐 Token inválido - verifique .env",
             extra={"error_type": "LoginFailure"},
         )
 
     except discord.HTTPException:
-        logger.exception("❌ Erro de conexão com Discord")
-        logger.info("💡 Verifique sua conexão com internet")
         audit.error(
-            f"{__name__} | Erro de conexão HTTP com Discord",
+            f"{__name__} | 🌐 Erro de conexão HTTP com Discord",
             extra={"error_type": "HTTPException"},
         )
 
     except FileNotFoundError:
-        logger.exception("❌ Arquivo .env não encontrado!")
-        logger.info("💡 Crie .env com: TOKEN=seu_token_aqui")
         audit.critical(
-            f"{__name__} | Arquivo .env não encontrado",
+            f"{__name__} | 📄 Arquivo .env não encontrado",
             extra={"error_type": "FileNotFoundError"},
         )
 
     except Exception as e:
         if "pickle" in str(e).lower():
-            logger.exception("❌ Arquivo corrompido detectado!")
-            logger.info("🔧 Remova a pasta 'json' e execute novamente")
             audit.error(
-                f"{__name__} | Arquivo corrompido detectado",
+                f"{__name__} | 🔴 Arquivo corrompido detectado",
                 extra={"error_type": "PickleError", "error_detail": str(e)},
             )
         else:
-            logger.exception("❌ Erro inesperado")
             audit.critical(
-                f"{__name__} | Erro inesperado na aplicação: {e}",
+                f"{__name__} | 🔴 Erro inesperado na aplicação",
                 extra={"error_type": type(e).__name__, "error_detail": str(e)},
             )
 
     finally:
         audit.info(
-            f"{__name__} | ✅ Bot encerrado.",
+            f"{__name__} | ✅ Bot encerrado com sucesso",
+            extra={"action": "shutdown"},
         )
 
 

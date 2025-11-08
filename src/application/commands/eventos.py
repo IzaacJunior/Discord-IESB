@@ -21,8 +21,8 @@ from infrastructure.repositories import (
 )
 from presentation.controllers.channel_controller import ChannelController
 
-# 📝 Logger para rastreamento de eventos
 logger = logging.getLogger(__name__)
+audit = logging.getLogger("audit")
 
 
 class Eventos(commands.Cog):
@@ -72,7 +72,7 @@ class Eventos(commands.Cog):
             - Deletar sala temporária quando ficar vazia
             - Transferir ownership se dono sair
         """
-        logger.info("🎧 Voice state update: %s", member.name)
+        logger.debug("🎧 Voice state update: %s", member.name)
 
         # 🎯 STEP 1: Delega para o Controller (Presentation Layer)
         await self.channel_controller.handle_voice_state_update(
@@ -107,6 +107,18 @@ class Eventos(commands.Cog):
         💡 Design Pattern: Event-Driven Architecture
         """
         logger.info("👋 %s entrou no servidor %s", member.name, member.guild.name)
+        
+        # 📊 Auditando entrada de membro (evento importante)
+        audit.info(
+            "👋 Membro entrou no servidor",
+            extra={
+                'member_id': member.id,
+                'member_name': member.display_name,
+                'guild_id': member.guild.id,
+                'guild_name': member.guild.name,
+                'action': 'member_join',
+            },
+        )
 
         # 🤖 Ignora bots - eles não precisam de fóruns privados
         if member.bot:
@@ -158,6 +170,20 @@ class Eventos(commands.Cog):
                     member.display_name,
                     category.name,
                 )
+                
+                # 📊 Auditando criação bem-sucedida de fórum único
+                audit.info(
+                    "🏠 Fórum único criado com sucesso",
+                    extra={
+                        'member_id': member.id,
+                        'member_name': member.display_name,
+                        'category_id': category.id,
+                        'category_name': category.name,
+                        'guild_id': guild.id,
+                        'guild_name': guild.name,
+                        'action': 'unique_forum_created',
+                    },
+                )
             else:
                 logger.info(
                     "⏭️ Fórum não criado (pode já existir) | member=%s | categoria=%s",
@@ -169,6 +195,18 @@ class Eventos(commands.Cog):
             logger.exception(
                 "❌ Erro ao processar entrada de membro %s",
                 member.display_name,
+            )
+            
+            # 📊 Auditando erro na criação de fórum
+            audit.info(
+                "❌ Erro ao processar entrada de membro",
+                extra={
+                    'member_id': member.id,
+                    'member_name': member.display_name,
+                    'guild_id': member.guild.id,
+                    'guild_name': member.guild.name,
+                    'action': 'member_join_error',
+                },
             )
 
 

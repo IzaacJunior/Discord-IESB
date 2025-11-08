@@ -272,7 +272,7 @@ class TempRoomControlView(discord.ui.View):
 
         # 🎯 Sistema híbrido: adapta baseado no tamanho do servidor
         guild_size = len(voice_channel.guild.members)
-        logger.info("🎮 Servidor com %d membros | adaptando interface", guild_size)
+        logger.debug("🎮 Servidor com %d membros | adaptando interface", guild_size)
 
         # Adiciona botão adaptativo para adicionar pessoas
         self._add_user_management_button(guild_size)
