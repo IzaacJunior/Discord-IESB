@@ -14,6 +14,7 @@ from discord.ext import commands
 
 from config import COMMAND_PREFIX
 from infrastructure.database.audit_logger import audit_logger  # noqa: F401
+from infrastructure.database.cleanup_manager import create_cleanup_manager
 from infrastructure.repositories import (
     DiscordChannelRepository,
     SQLiteCategoryRepository,
@@ -57,6 +58,9 @@ class DIContainer:
 
         # 🔧 STEP 3: Cria controller com repository Discord
         self.channel_controller = ChannelController(self.channel_repository)
+
+        # 🔧 STEP 4: Cria gerenciador de limpeza de logs com retenção automática
+        self.cleanup_manager = create_cleanup_manager()
 
 
 class CleanArchitectureBot:
@@ -231,6 +235,15 @@ async def start() -> None:
         status = await clean_bot.load_clean_extensions()
         audit.info(f"{__name__} | {status}")
 
+        # 🔧 STEP 2: Inicia o gerenciador de limpeza de logs
+        cleanup_task = asyncio.create_task(
+            clean_bot.container.cleanup_manager.start_cleanup_loop()
+        )
+        audit.info(
+            f"{__name__} | 🧹 LogCleanupManager iniciado com sucesso",
+            extra={"action": "cleanup_manager_start"},
+        )
+
         try:
             audit.info(
                 f"{__name__} | 🚀 Conectando ao Discord",
@@ -250,6 +263,16 @@ async def start() -> None:
             )
             raise
         finally:
+            # 🧹 Parar cleanup_manager antes de limpar salas temporárias
+            clean_bot.container.cleanup_manager.stop()
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                audit.info(
+                    f"{__name__} | 🛑 LogCleanupManager parado com sucesso",
+                    extra={"action": "cleanup_manager_stop"},
+                )
             await cleanup_temp_rooms()
 
 
